@@ -100,9 +100,9 @@ typedef struct _nflog_state_t {
     nflog_header_t* header;
     nflog_entry_t* store;
 
-	struct nflog_handle *nfl_fd;
-	struct nflog_g_handle *nfl_group_fd;
+    struct nflog_handle *nfl_fd;
+    struct nflog_g_handle *nfl_group_fd;
 
-	pthread_mutex_t lock;
-	pthread_t thread;
+    pthread_mutex_t lock;
+    pthread_t thread;
 } nflog_state_t;

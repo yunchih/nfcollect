@@ -74,7 +74,7 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
             entry->uid = (uint32_t)~0;
 
         // get current timestamp
-        time(&entry->timestamp);
+        entry->timestamp = time(NULL);
         nf->header->n_entries++;
     }
 
