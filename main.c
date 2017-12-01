@@ -56,19 +56,6 @@ void sig_handler(int signo) {
         /* TODO */
     }
 }
-nflog_state_t *get_nflog_state(uint32_t id, uint32_t entries_max) {
-    nflog_state_t *state =
-        (nflog_state_t *)malloc(sizeof(nflog_state_t));
-    pthread_mutex_init(&(state->lock), NULL);
-    state->store = (nflog_entry_t *)malloc(sizeof(nflog_entry_t) *
-                                                  entries_max);
-    state->header.id = id;
-    state->header.max_n_entries = entries_max;
-    state->header.n_entries = 0;
-    return state;
-}
-
-void free_nflog_state(nflog_state_t **state) { *state = NULL; }
 
 int main(int argc, char *argv[]) {
 
@@ -153,14 +140,17 @@ int main(int argc, char *argv[]) {
     nfl_commit_init(trunk_cnt);
 
     for (i = 0;; i = (i + 1) % trunk_cnt) {
-        trunks[i] =
-            trunks[i] != NULL ? trunks[i] : get_nflog_state(i, entries_max);
+        nfl_state_update_or_create(&(trunks[i]), i, entries_max);
+        // will be unlocked when #i has finished receiving & committing
         pthread_mutex_lock(&(trunks[i]->lock));
         pthread_create(&(trunks[i]->thread), NULL, nflog_worker,
                        (void *)trunks[i]);
+        // wait for current receiver worker
         pthread_join(trunks[i]->thread, NULL);
     }
     
-    sem_destroy(&nfl_commit_queue);
+    // Won't reach here
+    // We don't actually free trunks or the semaphore at all
+    // sem_destroy(&nfl_commit_queue);
     exit(0);
 }

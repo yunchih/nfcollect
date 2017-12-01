@@ -97,7 +97,7 @@ typedef struct __attribute__((packed)) _nflog_entry_t {
 
 
 typedef struct _nflog_state_t {
-    nflog_header_t header;
+    nflog_header_t* header;
     nflog_entry_t* store;
 
 	struct nflog_handle *nfl_fd;
