@@ -5,7 +5,6 @@
 extern char *storage_dir;
 extern char *storage_prefix;
 const uint32_t write_blk_size = 8196;
-const uint32_t commit_file_open_flag = O_RDWR | O_CREAT | O_APPEND | O_DIRECT;
 
 void nfl_commit_init() {
 

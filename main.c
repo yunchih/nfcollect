@@ -56,26 +56,6 @@ void sig_handler(int signo) {
         /* TODO */
     }
 }
-/*
-void *open_trunk_storage(uint32_t size){
-    int fd;
-
-    // open file and map to memory
-    ERR((fd = open(mapfile, O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600)) == -1,
-                 "Could not open file");
-
-    ERR(lseek(fd, size - 1, SEEK_SET) == -1,
-                 "Could not seek to end of file");
-
-    // ERR(fallocate(fd, 0, 0, storage_size_byte) == -1,
-    //             "Could not seek to end of file");
-
-    ERR(write(fd, "", 1) == -1, "Could not write to end of file");
-
-    return mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-}
-*/
-
 nflog_state_t *get_nflog_state(uint32_t id, uint32_t entries_max) {
     nflog_state_t *state =
         (nflog_state_t *)malloc(sizeof(nflog_state_t));
