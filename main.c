@@ -133,17 +133,20 @@ int main(int argc, char *argv[]) {
     sem_init(&nfl_commit_queue, 0, max_commit_worker);
 
     // Set up nflog receiver worker
-    nflog_state_t **trunks = (nflog_state_t **)malloc(sizeof(void*) * trunk_cnt);
+    nflog_state_t **trunks = (nflog_state_t **)calloc(trunk_cnt, sizeof(void*));
     for (i = 0; i < trunk_cnt; ++i) {
         trunks[i] = NULL;
     }
     
     nfl_commit_init(trunk_cnt);
 
+    debug("Worker started, entries_max = %d, trunk_cnt = %d, trunk_size_byte = %d",
+            entries_max, trunk_cnt, trunk_size_byte);
     for (i = 0;; i = (i + 1) % trunk_cnt) {
+        if(trunks[i])
+            pthread_mutex_lock(&(trunks[i]->lock));
         nfl_state_update_or_create(&(trunks[i]), i, entries_max);
         // will be unlocked when #i has finished receiving & committing
-        pthread_mutex_lock(&(trunks[i]->lock));
         pthread_create(&(trunks[i]->thread), NULL, nflog_worker,
                        (void *)trunks[i]);
         // wait for current receiver worker
