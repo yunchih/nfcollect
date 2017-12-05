@@ -120,7 +120,8 @@ int main(int argc, char *argv[]) {
     ERR(signal(SIGHUP, sig_handler) == SIG_ERR, "Could not set SIGHUP handler");
 
     uint32_t pgsize = getpagesize();
-    uint32_t trunk_size_byte = (storage_size * 1024 * 1024) / TRUNK_SIZE ; // MiB
+    storage_size *= 1024 * 1024; // MiB
+    uint32_t trunk_size_byte = storage_size / TRUNK_SIZE ;
     trunk_size_byte = (trunk_size_byte < TRUNK_SIZE) ? TRUNK_SIZE : trunk_size_byte;
     trunk_size_byte = (trunk_size_byte / pgsize) * pgsize; // align with pagesize
 
