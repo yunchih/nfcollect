@@ -40,15 +40,15 @@ uint16_t nfl_group_id;
 char *storage_dir = NULL;
 const char *storage_prefix = "nflog_storage";
 
-const char *version_text = "nfcollect Version 0.1\n";
 const char *help_text =
-    "Usage: nfcollect [OPTION]\n"
-    "Foo bar\n"
+    "Usage: " PACKAGE " [OPTION]\n"
     "\n"
     "Options:\n"
-    "  -h --help                 print this help\n"
-    "  -v --version              print version information\n"
-    "     --nflog-group=<id>     nflog group\n"
+    "  -d --storage_dir=<dirname>   log files storage directory\n"
+    "  -h --help                    print this help\n"
+    "  -g --nflog-group=<id>        the group id to collect\n"
+    "  -s --storage_size=<dirsize>  log files maximum total size in MiB\n"
+    "  -v --version                 print version information\n"
     "\n";
 
 void sig_handler(int signo) {
@@ -71,17 +71,17 @@ int main(int argc, char *argv[]) {
                                 {0, 0, 0, 0}};
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "g:d:hv", longopts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "g:d:s:hv", longopts, NULL)) != -1) {
         switch (opt) {
         case 'h':
             printf("%s", help_text);
             exit(0);
             break;
         case 'v':
-            printf("%s", version_text);
+            printf("%s %s", PACKAGE, VERSION);
             exit(0);
             break;
-        case 'f':
+        case 'd':
             storage_dir = optarg;
             break;
         case 'g':
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
            "You must provide a nflog group (see --help)!\n");
     ASSERT(storage_dir != NULL,
            "You must provide a storage directory (see --help)\n");
-    ASSERT(storage_size == 0, "You must provide the desired size of log file "
+    ASSERT(storage_size != 0, "You must provide the desired size of log file "
                               "(in MiB) (see --help)\n");
     struct stat _d;
     if(stat(storage_dir, &_d) != 0 || !S_ISDIR(_d.st_mode)){
