@@ -1,3 +1,9 @@
 .*.swp
 *.o
 ref
+configure
+config.*
+build-aux
+autom4te.cache
+aclocal.*
+Makefile.in
