@@ -49,7 +49,7 @@
   }
 #define debug(format, ...)                                                     \
   if (DEBUG_ON) {                                                              \
-    fprintf(stdout, format, ##__VA_ARGS__);                                    \
+    fprintf(stdout, format "\n", ##__VA_ARGS__);                               \
   }
 
 #define CEILING(a,b) ((a)%(b) == 0 ? ((a)/(b)) : ((a)/(b)+1))
@@ -106,3 +106,6 @@ typedef struct _nflog_state_t {
     pthread_mutex_t lock;
     pthread_t thread;
 } nflog_state_t;
+
+// only copy size of ipv4 header + tcp header
+static const int nflog_recv_size = sizeof(struct iphdr) + sizeof(struct tcphdr);

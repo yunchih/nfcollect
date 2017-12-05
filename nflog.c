@@ -41,42 +41,63 @@ static void nfl_commit(nflog_state_t *nf);
 
 static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
                          struct nflog_data *nfa, void *_nf) {
+    register const struct iphdr *iph;
+    register nflog_entry_t *entry;
+    const struct tcphdr *tcph;
+    const struct udphdr *udph;
     char *payload;
+    void *inner_hdr;
+    uint32_t uid;
+
     int payload_len = nflog_get_payload(nfa, &payload);
     nflog_state_t *nf = (nflog_state_t *)_nf;
 
     // only process ipv4 packet
-    if (payload_len >= 0 && ((payload[0] & 0xf0) == 0x40)) {
-        struct iphdr *iph = (struct iphdr *)payload;
-        nflog_entry_t *entry = &(nf->store[nf->header->n_entries]);
+    if (payload_len < 0 || ((payload[0] & 0xf0) != 0x40))
+        return 1;
 
-        void *inner_hdr = iph + iph->ihl;
-        // Only accept TCP / UDP packets
-        if (iph->protocol == IPPROTO_TCP) {
-            struct tcphdr *tcph = (struct tcphdr *)inner_hdr;
-            entry->sport = ntohs(tcph->source);
-            entry->dport = ntohs(tcph->dest);
-        } else if (iph->protocol == IPPROTO_UDP) {
-            struct udphdr *tcph = (struct udphdr *)inner_hdr;
-            entry->sport = ntohs(tcph->source);
-            entry->dport = ntohs(tcph->dest);
-        } else
-            return 1; // Ignore other types of packet
+    iph = (struct iphdr *)payload;
+    entry = &(nf->store[nf->header->n_entries]);
 
-        entry->daddr.s_addr = iph->daddr;
-        entry->protocol = iph->protocol;
+    inner_hdr = (uint32_t *)iph + iph->ihl;
+    // Only accept TCP / UDP packets
+    if (iph->protocol == IPPROTO_TCP) {
+        tcph = (struct tcphdr *)inner_hdr;
+        entry->sport = ntohs(tcph->source);
+        entry->dport = ntohs(tcph->dest);
 
-        // get sender uid
-        uint32_t uid;
-        if (nflog_get_uid(nfa, &uid) == 0)
-            entry->uid = uid;
-        else
-            entry->uid = (uint32_t)~0;
+        // only process SYNC and PSH packet, drop ACK
+        if(!tcph->syn && !tcph->psh)
+            return 1;
+    } else if (iph->protocol == IPPROTO_UDP) {
+        udph = (struct udphdr *)inner_hdr;
+        entry->sport = ntohs(udph->source);
+        entry->dport = ntohs(udph->dest);
+    } else
+        return 1; // Ignore other types of packet
 
-        // get current timestamp
-        entry->timestamp = time(NULL);
-        nf->header->n_entries++;
-    }
+    entry->daddr.s_addr = iph->daddr;
+    entry->protocol = iph->protocol;
+
+    // get sender uid
+    if (nflog_get_uid(nfa, &uid) != 0)
+        return 1;
+    entry->uid = uid;
+
+    // get current timestamp
+    time(&entry->timestamp);
+    nf->header->n_entries++;
+
+    debug("Recv packet info: "
+          "timestamp:\t%ld\t"
+          "daddr:\t%d\t"
+          "transfer:\t%s\t"
+          "uid:\t%d\t"
+          "sport:\t%d\t"
+          "dport:\t%d",
+          entry->timestamp, entry->daddr,
+          iph->protocol == IPPROTO_TCP ? "TCP" : "UDP",
+          entry->uid, entry->sport, entry->dport);
 
     // Ignore IPv6 packet for now Q_Q
     return 0;
@@ -84,19 +105,21 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
 
 static void nfl_init(nflog_state_t *nf) {
     // open nflog
-    ERR((nf->nfl_fd = nflog_open()) == NULL, "error during nflog_open()")
+    ERR((nf->nfl_fd = nflog_open()) == NULL, "nflog_open")
+    debug("Opening nflog communication file descriptor");
 
     // monitor IPv4 packets only
-    ERR(nflog_bind_pf(nf->nfl_fd, AF_INET) < 0, "error during nflog_bind_pf()");
+    ERR(nflog_bind_pf(nf->nfl_fd, AF_INET) < 0, "nflog_bind_pf");
 
     // bind to group
     nf->nfl_group_fd = nflog_bind_group(nf->nfl_fd, nfl_group_id);
 
-    // only copy size of ipv4 header + tcp/udp src/dest port (first 4 bytes of their headers
-    ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, sizeof(struct iphdr) + 4) < 0,
+    /* ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, sizeof(struct iphdr) + 4) < 0, */
+    ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nflog_recv_size) < 0,
         "Could not set copy mode");
 
-    nflog_callback_register(nf->nfl_group_fd, &handle_packet, NULL);
+    nflog_callback_register(nf->nfl_group_fd, &handle_packet, nf);
+    debug("Registering nflog callback");
 }
 
 static void nfl_cleanup(nflog_state_t *nf) {
@@ -112,18 +135,19 @@ void *nflog_worker(void *targs) {
     uint32_t *p_cnt_now = &(nf->header->n_entries);
     uint32_t cnt_max = nf->header->max_n_entries;
 
-    debug("Recv worker #%u: main loop starts\n", nf->header->id);
-    nf->header->start_time = time(NULL);
+    debug("Recv worker #%u: main loop starts", nf->header->id);
+    time(&nf->header->start_time);
+
     while (*p_cnt_now < cnt_max) {
         int rv; char buf[4096];
         if ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0) {
-            debug("Recv worker #%u: nflog packet received (len=%u)\n", nf->header->id,
+            debug("Recv worker #%u: nflog packet received (len=%u)", nf->header->id,
                   rv);
             nflog_handle_packet(nf->nfl_fd, buf, rv);
         }
     }
 
-    nf->header->end_time = time(NULL);
+    time(&nf->header->end_time);
     nfl_cleanup(nf);
     nfl_commit(nf);
 
@@ -143,12 +167,12 @@ void nfl_commit(nflog_state_t *nf) {
 
 void *_nfl_commit_worker(void *targs) {
     nflog_state_t* nf = (nflog_state_t*) targs;
-    debug("Comm worker #%u: thread started\n", nf->header->id);
+    debug("Comm worker #%u: thread started", nf->header->id);
 
     sem_wait(&nfl_commit_queue);
-    debug("Comm worker #%u: commit started\n", nf->header->id);
+    debug("Comm worker #%u: commit started", nf->header->id);
     nfl_commit_worker(nf->header, nf->store);
-    debug("Comm worker #%u: commit done\n", nf->header->id);
+    debug("Comm worker #%u: commit done", nf->header->id);
     sem_post(&nfl_commit_queue);
 
     // Commit finished
@@ -171,6 +195,7 @@ void nfl_state_update_or_create(nflog_state_t **nf, uint32_t id, uint32_t entrie
     // on the fly, to squeeze more space for compression.
     (*nf)->store = (nflog_entry_t *)malloc(sizeof(nflog_entry_t) *
                                                   entries_max);
+    (*nf)->header = (nflog_header_t *)malloc(sizeof(nflog_header_t));
     (*nf)->header->id = id;
     (*nf)->header->max_n_entries = entries_max;
     (*nf)->header->n_entries = 0;
