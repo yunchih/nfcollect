@@ -120,7 +120,8 @@ int main(int argc, char *argv[]) {
     ERR(signal(SIGHUP, sig_handler) == SIG_ERR, "Could not set SIGHUP handler");
 
     uint32_t pgsize = getpagesize();
-    uint32_t trunk_size_byte = storage_size / TRUNK_SIZE * 1024 * 1024; // MiB
+    uint32_t trunk_size_byte = (storage_size * 1024 * 1024) / TRUNK_SIZE ; // MiB
+    trunk_size_byte = (trunk_size_byte < TRUNK_SIZE) ? TRUNK_SIZE : trunk_size_byte;
     trunk_size_byte = (trunk_size_byte / pgsize) * pgsize; // align with pagesize
 
     uint32_t trunk_cnt = CEILING(storage_size, trunk_size_byte);
@@ -131,8 +132,7 @@ int main(int argc, char *argv[]) {
     sem_init(&nfl_commit_queue, 0, max_commit_worker);
 
     // Set up nflog receiver worker
-    nflog_state_t **trunks = (nflog_state_t **)malloc(
-        sizeof(nflog_state_t *) * trunk_cnt);
+    nflog_state_t **trunks = (nflog_state_t **)malloc(sizeof(void*) * trunk_cnt);
     for (i = 0; i < trunk_cnt; ++i) {
         trunks[i] = NULL;
     }
