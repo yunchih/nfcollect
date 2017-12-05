@@ -53,7 +53,9 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
     nflog_state_t *nf = (nflog_state_t *)_nf;
 
     // only process ipv4 packet
-    if (payload_len < 0 || ((payload[0] & 0xf0) != 0x40))
+    if (unlikely(payload_len < 0) || ((payload[0] & 0xf0) != 0x40))
+        return 1;
+    if (unlikely(nf->header->n_entries >= nf->header->max_n_entries))
         return 1;
 
     iph = (struct iphdr *)payload;
@@ -88,13 +90,14 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
     time(&entry->timestamp);
     nf->header->n_entries++;
 
-    debug("Recv packet info: "
+    debug("Recv packet info entry #%d: "
           "timestamp:\t%ld\t"
           "daddr:\t%d\t"
           "transfer:\t%s\t"
           "uid:\t%d\t"
           "sport:\t%d\t"
           "dport:\t%d",
+          nf->header->n_entries,
           entry->timestamp, entry->daddr,
           iph->protocol == IPPROTO_TCP ? "TCP" : "UDP",
           entry->uid, entry->sport, entry->dport);
@@ -147,6 +150,7 @@ void *nflog_worker(void *targs) {
         }
     }
 
+    debug("Recv worker #%u: finish recv", nf->header->id);
     time(&nf->header->end_time);
     nfl_cleanup(nf);
     nfl_commit(nf);

@@ -52,6 +52,9 @@
     fprintf(stdout, format "\n", ##__VA_ARGS__);                               \
   }
 
+#define likely(x)    __builtin_expect((x),1)
+#define unlikely(x)  __builtin_expect((x),0)
+
 #define CEILING(a,b) ((a)%(b) == 0 ? ((a)/(b)) : ((a)/(b)+1))
 #define TRUNK_SIZE (4096 * 150)
 
