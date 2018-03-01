@@ -23,21 +23,20 @@
 // SOFTWARE.
 
 #include "commit.h"
-#include "nflog.h"
-#include "main.h"
+#include "common.h"
 #include <stddef.h>    // size_t for libnetfilter_log
 #include <sys/types.h> // u_int32_t for libnetfilter_log
 #include <libnetfilter_log/libnetfilter_log.h>
 #include <pthread.h>
 #include <time.h>
 
-extern sem_t nfl_commit_queue;
-extern uint16_t nfl_group_id;
+nflog_global_t *g;
 
-static void nfl_cleanup(nflog_state_t *nf);
+static void nfl_cleanup(void *nf);
 static void nfl_init(nflog_state_t *nf);
-static void *_nfl_commit_worker(void *targs);
+static void *nfl_start_commit_worker(void *targs);
 static void nfl_commit(nflog_state_t *nf);
+static void nfl_state_free(nflog_state_t *nf);
 
 static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
                          struct nflog_data *nfa, void *_nf) {
@@ -51,6 +50,8 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
 
     int payload_len = nflog_get_payload(nfa, &payload);
     nflog_state_t *nf = (nflog_state_t *)_nf;
+
+    pthread_testcancel(); /* cancellation point */
 
     // only process ipv4 packet
     if (unlikely(payload_len < 0) || ((payload[0] & 0xf0) != 0x40))
@@ -92,13 +93,13 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
 
     debug("Recv packet info entry #%d: "
           "timestamp:\t%ld\t"
-          "daddr:\t%d\t"
+          "daddr:\t%ld\t"
           "transfer:\t%s\t"
           "uid:\t%d\t"
           "sport:\t%d\t"
           "dport:\t%d",
           nf->header->n_entries,
-          entry->timestamp, entry->daddr,
+          entry->timestamp, (unsigned long)entry->daddr.s_addr,
           iph->protocol == IPPROTO_TCP ? "TCP" : "UDP",
           entry->uid, entry->sport, entry->dport);
 
@@ -115,7 +116,7 @@ static void nfl_init(nflog_state_t *nf) {
     ERR(nflog_bind_pf(nf->nfl_fd, AF_INET) < 0, "nflog_bind_pf");
 
     // bind to group
-    nf->nfl_group_fd = nflog_bind_group(nf->nfl_fd, nfl_group_id);
+    nf->nfl_group_fd = nflog_bind_group(nf->nfl_fd, nf->global->nfl_group_id);
 
     /* ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, sizeof(struct iphdr) + 4) < 0, */
     ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nflog_recv_size) < 0,
@@ -123,14 +124,23 @@ static void nfl_init(nflog_state_t *nf) {
 
     nflog_callback_register(nf->nfl_group_fd, &handle_packet, nf);
     debug("Registering nflog callback");
+
+    g = nf->global;
 }
 
-static void nfl_cleanup(nflog_state_t *nf) {
+static void nfl_cleanup(void *args) {
+    nflog_state_t *nf = (nflog_state_t *)args;
+
+    // write end time
+    time(&nf->header->end_time);
     nflog_unbind_group(nf->nfl_group_fd);
     nflog_close(nf->nfl_fd);
+
+    // commit to file
+    if(g->commit_when_died) nfl_commit(nf);
 }
 
-void *nflog_worker(void *targs) {
+void *nfl_collect_worker(void *targs) {
     nflog_state_t *nf = (nflog_state_t *)targs;
     nfl_init(nf);
 
@@ -140,10 +150,13 @@ void *nflog_worker(void *targs) {
 
     debug("Recv worker #%u: main loop starts", nf->header->id);
     time(&nf->header->start_time);
+    pthread_cleanup_push(nfl_cleanup, (void*)nf);
 
+
+    int rv; char buf[4096];
     while (*p_cnt_now < cnt_max) {
-        int rv; char buf[4096];
-        if ((rv = recv(fd, buf, sizeof(buf), 0)) && rv >= 0) {
+        pthread_testcancel(); /* cancellation point */
+        if ((rv = recv(fd, buf, sizeof(buf), 0)) && rv > 0) {
             debug("Recv worker #%u: nflog packet received (len=%u)", nf->header->id,
                   rv);
             nflog_handle_packet(nf->nfl_fd, buf, rv);
@@ -151,11 +164,7 @@ void *nflog_worker(void *targs) {
     }
 
     debug("Recv worker #%u: finish recv", nf->header->id);
-    time(&nf->header->end_time);
-    nfl_cleanup(nf);
-    nfl_commit(nf);
-
-    /* TODO: can return exit status */
+    pthread_cleanup_pop(1);
     pthread_exit(NULL);
 }
 
@@ -163,35 +172,41 @@ void *nflog_worker(void *targs) {
  * Committer
  */
 
-void nfl_commit(nflog_state_t *nf) {
+static void nfl_commit(nflog_state_t *nf) {
     pthread_t tid;
-    pthread_create(&tid, NULL, _nfl_commit_worker, (void *)nf);
+    pthread_create(&tid, NULL, nfl_start_commit_worker, (void *)nf);
     pthread_detach(tid);
 }
 
-void *_nfl_commit_worker(void *targs) {
+static void *nfl_start_commit_worker(void *targs) {
     nflog_state_t* nf = (nflog_state_t*) targs;
+    const char *filename = nfl_get_filename(g->storage_dir, nf->header->id);
     debug("Comm worker #%u: thread started", nf->header->id);
 
-    sem_wait(&nfl_commit_queue);
+    sem_wait(g->nfl_commit_queue);
     debug("Comm worker #%u: commit started", nf->header->id);
-    nfl_commit_worker(nf->header, nf->store);
+    nfl_commit_worker(nf->header, nf->store, filename);
     debug("Comm worker #%u: commit done", nf->header->id);
-    sem_post(&nfl_commit_queue);
+    sem_post(g->nfl_commit_queue);
 
     // Commit finished
     nfl_state_free(nf);
+    free((char*)filename);
     pthread_mutex_unlock(&(nf->lock));
+    pthread_exit(NULL);
 }
 
 /*
  * State managers
  */
 
-void nfl_state_update_or_create(nflog_state_t **nf, uint32_t id, uint32_t entries_max) {
+void nfl_state_update_or_create(nflog_state_t **nf,
+                                uint32_t id, uint32_t entries_max,
+                                nflog_global_t *g) {
     if(*nf == NULL) {
         *nf = (nflog_state_t *)malloc(sizeof(nflog_state_t));
         pthread_mutex_init(&((*nf)->lock), NULL);
+        (*nf)->global = g;
     }
 
     // Don't use calloc here, as it will consume physical memory
@@ -208,6 +223,6 @@ void nfl_state_update_or_create(nflog_state_t **nf, uint32_t id, uint32_t entrie
 void nfl_state_free(nflog_state_t *nf) {
     // Free header and store only
     // Leave the rest intact
-    free(nf->header);
-    free(nf->store);
+    free((void*)nf->header);
+    free((void*)nf->store);
 }

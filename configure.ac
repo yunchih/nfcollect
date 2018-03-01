@@ -1,7 +1,7 @@
 AC_INIT([nfcollect], [1.0])
 
 # Safety checks in case user overwritten --srcdir
-AC_CONFIG_SRCDIR([main.c])
+AC_CONFIG_SRCDIR([nfcollect.c])
 
 # Store the auxiliary build tools (e.g., install-sh, config.sub, config.guess)
 # in this dir (build-aux)

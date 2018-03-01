@@ -22,7 +22,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma once
+#ifndef _MAIN_H
+#define _MAIN_H
 #include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,11 +43,24 @@
     fputs((error_msg), stderr);                                                \
     exit(1);                                                                   \
   }
+
 #define ERR(command, error_msg)                                                \
   if (command) {                                                               \
     perror((error_msg));                                                       \
     exit(1);                                                                   \
   }
+
+#define WARN(command, format, ...)                                             \
+  if (command) {                                                               \
+    fprintf(stdout, format "\n", ##__VA_ARGS__);                               \
+  }
+
+#define WARN_RETURN(command, format, ...)                                      \
+  if (command) {                                                               \
+    fprintf(stdout, format "\n", ##__VA_ARGS__);                               \
+    return -1;                                                                 \
+  }
+
 #define debug(format, ...)                                                     \
   if (DEBUG_ON) {                                                              \
     fprintf(stdout, format "\n", ##__VA_ARGS__);                               \
@@ -55,16 +69,25 @@
 #define likely(x)    __builtin_expect((x),1)
 #define unlikely(x)  __builtin_expect((x),0)
 
-#define CEILING(a,b) ((a)%(b) == 0 ? ((a)/(b)) : ((a)/(b)+1))
-#define TRUNK_SIZE (4096 * 150)
+#define CEIL_DIV(a,b) (((a)+(b) - 1)/(b))
+#define TRUNK_SIZE_BY_PAGE (150) // 150 pages
+#define MAX_TRUNK_ID (80)
+#define STORAGE_PREFIX "nflog_storage"
+
+enum nflog_flag_t {
+    COMPRESS_NONE = 1,
+    COMPRESS_LZ4  = 2,
+    COMPRESS_ZSTD = 4
+};
 
 typedef struct __attribute__((packed)) _nflog_header_t {
-	uint32_t                   id;                   /*     0     4 */
-	uint32_t                   n_entries;            /*     4     4 */
-	uint32_t                   max_n_entries;        /*     8     4 */
-	uint32_t                   _unused;              /*    12     4 */
-	uint64_t                   start_time;           /*    16     8 */
-	uint64_t                   end_time;             /*    24     8 */
+	uint16_t                   cksum;                /*     0     4 */
+	enum nflog_flag_t          flag;                 /*     0     4 */
+	uint32_t                   id;                   /*     4     4 */
+	uint32_t                   n_entries;            /*     8     4 */
+	uint32_t                   max_n_entries;        /*    12     4 */
+	time_t                     start_time;           /*    16     8 */
+	time_t                     end_time;             /*    24     8 */
 
 	/* size: 32, cachelines: 1, members: 6 */
 } nflog_header_t;
@@ -99,7 +122,15 @@ typedef struct __attribute__((packed)) _nflog_entry_t {
 } nflog_entry_t;
 
 
+typedef struct _nflog_global_t {
+    sem_t* nfl_commit_queue;
+    uint16_t nfl_group_id;
+    uint8_t commit_when_died;
+    const char* storage_dir;
+} nflog_global_t;
+
 typedef struct _nflog_state_t {
+    nflog_global_t* global;
     nflog_header_t* header;
     nflog_entry_t* store;
 
@@ -112,3 +143,5 @@ typedef struct _nflog_state_t {
 
 // only copy size of ipv4 header + tcp header
 static const int nflog_recv_size = sizeof(struct iphdr) + sizeof(struct tcphdr);
+
+#endif // _MAIN_H

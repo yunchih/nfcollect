@@ -7,3 +7,4 @@ build-aux
 autom4te.cache
 aclocal.*
 Makefile.in
+Makefile

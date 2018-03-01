@@ -2,19 +2,14 @@
 #include <string.h>
 #include "commit.h"
 
-extern char *storage_dir;
-extern char *storage_prefix;
-
 void nfl_commit_init() {
 
 }
 
-void nfl_commit_worker(nflog_header_t* header, nflog_entry_t* store) {
+void nfl_commit_worker(nflog_header_t* header, nflog_entry_t* store, const char* filename) {
     FILE* f;
-    char filename[1024];
-    uint32_t written, id = header->id;
+    uint32_t written;
 
-    sprintf(filename, "%s/%s_%d", storage_dir, storage_prefix, id);
     debug("Comm worker #%u: commit to file %s\n", header->id, filename);
     ERR((f = fopen(filename, "wb")) == NULL, strerror(errno));
     

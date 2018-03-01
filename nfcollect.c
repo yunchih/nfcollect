@@ -25,7 +25,7 @@
 
 #include "commit.h"
 #include "main.h"
-#include "nflog.h"
+#include "collect.h"
 #include <fcntl.h>
 #include <getopt.h>
 #include <pthread.h>
@@ -34,11 +34,6 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-sem_t nfl_commit_queue;
-uint16_t nfl_group_id;
-char *storage_dir = NULL;
-const char *storage_prefix = "nflog_storage";
 
 const char *help_text =
     "Usage: " PACKAGE " [OPTION]\n"
@@ -60,19 +55,28 @@ void sig_handler(int signo) {
 int main(int argc, char *argv[]) {
 
     uint32_t i, max_commit_worker = 0, storage_size = 0;
-    int nflog_group_id;
+    uint32_t trunk_cnt = 0, trunk_size = 0;
+    uint32_t entries_max;
+    nflog_global_t g;
+    int nfl_group_id;
+    char *storage_dir = NULL;
+    uint8_t commit_when_died = 0;
 
     struct option longopts[] = {/* name, has_args, flag, val */
                                 {"nflog-group", required_argument, NULL, 'g'},
                                 {"storage_dir", required_argument, NULL, 'd'},
                                 {"storage_size", required_argument, NULL, 's'},
                                 {"help", no_argument, NULL, 'h'},
+                                {"commit_when_died", no_argument, NULL, 'c'},
                                 {"version", no_argument, NULL, 'v'},
                                 {0, 0, 0, 0}};
 
     int opt;
     while ((opt = getopt_long(argc, argv, "g:d:s:hv", longopts, NULL)) != -1) {
         switch (opt) {
+        case 'c':
+            commit_when_died = 1;
+            break;
         case 'h':
             printf("%s", help_text);
             exit(0);
@@ -85,7 +89,7 @@ int main(int argc, char *argv[]) {
             storage_dir = optarg;
             break;
         case 'g':
-            nflog_group_id = atoi(optarg);
+            nfl_group_id = atoi(optarg);
             break;
         case 's':
             storage_size = atoi(optarg);
@@ -97,16 +101,14 @@ int main(int argc, char *argv[]) {
     }
 
     // verify arguments
-    ASSERT(nflog_group_id != -1,
+    ASSERT(nfl_group_id != -1,
            "You must provide a nflog group (see --help)!\n");
     ASSERT(storage_dir != NULL,
            "You must provide a storage directory (see --help)\n");
     ASSERT(storage_size != 0, "You must provide the desired size of log file "
                               "(in MiB) (see --help)\n");
-    struct stat _d;
-    if(stat(storage_dir, &_d) != 0 || !S_ISDIR(_d.st_mode)){
-        fprintf(stderr, "storage directory '%s' not exist", storage_dir);
-    }
+
+    ERR(nfl_check_dir(storage_dir) < 0, "storage directory not exist");
 
     // max number of commit worker defaults to #processor - 1
     if (max_commit_worker == 0) {
@@ -114,40 +116,33 @@ int main(int argc, char *argv[]) {
         max_commit_worker = max_commit_worker > 0 ? max_commit_worker : 1;
     }
 
-    nfl_group_id = nflog_group_id;
+    g.nfl_group_id = nfl_group_id;
+    g.commit_when_died = commit_when_died;
+    g.storage_dir = storage_dir;
 
     // register signal handler
     ERR(signal(SIGHUP, sig_handler) == SIG_ERR, "Could not set SIGHUP handler");
 
-    uint32_t pgsize = getpagesize();
-    storage_size *= 1024 * 1024; // MiB
-    uint32_t trunk_size_byte = storage_size / TRUNK_SIZE ;
-    trunk_size_byte = (trunk_size_byte < TRUNK_SIZE) ? TRUNK_SIZE : trunk_size_byte;
-    trunk_size_byte = (trunk_size_byte / pgsize) * pgsize; // align with pagesize
-
-    uint32_t trunk_cnt = CEILING(storage_size, trunk_size_byte);
-    uint32_t entries_max = (trunk_size_byte - sizeof(nflog_header_t)) /
-                           sizeof(nflog_entry_t);
+    nfl_cal_trunk(storage_size, &trunk_cnt, &trunk_size);
+    nfl_cal_entries(trunk_size, &entries_max);
 
     // Set up commit worker
-    sem_init(&nfl_commit_queue, 0, max_commit_worker);
+    g.nfl_commit_queue = malloc(sizeof(sem_t));
+    sem_init(g.nfl_commit_queue, 0, max_commit_worker);
 
     // Set up nflog receiver worker
     nflog_state_t **trunks = (nflog_state_t **)calloc(trunk_cnt, sizeof(void*));
-    for (i = 0; i < trunk_cnt; ++i) {
-        trunks[i] = NULL;
-    }
-    
     nfl_commit_init(trunk_cnt);
 
-    debug("Worker started, entries_max = %d, trunk_cnt = %d, trunk_size_byte = %d",
-            entries_max, trunk_cnt, trunk_size_byte);
+    debug("Worker started, entries_max = %d, trunk_cnt = %d", entries_max, trunk_cnt);
     for (i = 0;; i = (i + 1) % trunk_cnt) {
+        // will be unlocked when #i has finished receiving & committing
         if(trunks[i])
             pthread_mutex_lock(&(trunks[i]->lock));
-        nfl_state_update_or_create(&(trunks[i]), i, entries_max);
-        // will be unlocked when #i has finished receiving & committing
-        pthread_create(&(trunks[i]->thread), NULL, nflog_worker,
+
+        nfl_state_update_or_create(&(trunks[i]), i, entries_max, &g);
+
+        pthread_create(&(trunks[i]->thread), NULL, nfl_collect_worker,
                        (void *)trunks[i]);
         // wait for current receiver worker
         pthread_join(trunks[i]->thread, NULL);
