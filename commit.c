@@ -12,7 +12,7 @@ void nfl_commit_worker(nflog_header_t* header, nflog_entry_t* store, const char*
 
     debug("Comm worker #%u: commit to file %s\n", header->id, filename);
     ERR((f = fopen(filename, "wb")) == NULL, strerror(errno));
-    
+
     // commit header
     written = fwrite(header, 1, sizeof(nflog_header_t), f);
     ERR(written != sizeof(nflog_header_t), strerror(errno));
@@ -25,4 +25,3 @@ void nfl_commit_worker(nflog_header_t* header, nflog_entry_t* store, const char*
     // Do fsync ?
     fclose(f);
 }
-

@@ -24,7 +24,9 @@
 
 #ifndef _MAIN_H
 #define _MAIN_H
+#include <assert.h>
 #include <semaphore.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <netinet/in.h>
@@ -63,13 +65,15 @@
 
 #define debug(format, ...)                                                     \
   if (DEBUG_ON) {                                                              \
-    fprintf(stdout, format "\n", ##__VA_ARGS__);                               \
+    fprintf(stdout, "[DEBUG] " format "\n", ##__VA_ARGS__);                    \
   }
 
 #define likely(x)    __builtin_expect((x),1)
 #define unlikely(x)  __builtin_expect((x),0)
 
 #define CEIL_DIV(a,b) (((a)+(b) - 1)/(b))
+#define NEXT(i, l) ((i+1) % l)
+#define PREV(i, l) ((i-1) % l)
 #define TRUNK_SIZE_BY_PAGE (150) // 150 pages
 #define MAX_TRUNK_ID (80)
 #define STORAGE_PREFIX "nflog_storage"
@@ -125,7 +129,6 @@ typedef struct __attribute__((packed)) _nflog_entry_t {
 typedef struct _nflog_global_t {
     sem_t* nfl_commit_queue;
     uint16_t nfl_group_id;
-    uint8_t commit_when_died;
     const char* storage_dir;
 } nflog_global_t;
 
@@ -137,7 +140,9 @@ typedef struct _nflog_state_t {
     struct nflog_handle *nfl_fd;
     struct nflog_g_handle *nfl_group_fd;
 
-    pthread_mutex_t lock;
+    bool has_finished;
+    pthread_cond_t has_finished_cond;
+    pthread_mutex_t has_finished_lock;
     pthread_t thread;
 } nflog_state_t;
 

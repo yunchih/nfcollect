@@ -24,7 +24,7 @@
 // SOFTWARE.
 
 #include "commit.h"
-#include "main.h"
+#include "common.h"
 #include "collect.h"
 #include <fcntl.h>
 #include <getopt.h>
@@ -60,23 +60,18 @@ int main(int argc, char *argv[]) {
     nflog_global_t g;
     int nfl_group_id;
     char *storage_dir = NULL;
-    uint8_t commit_when_died = 0;
 
     struct option longopts[] = {/* name, has_args, flag, val */
                                 {"nflog-group", required_argument, NULL, 'g'},
                                 {"storage_dir", required_argument, NULL, 'd'},
                                 {"storage_size", required_argument, NULL, 's'},
                                 {"help", no_argument, NULL, 'h'},
-                                {"commit_when_died", no_argument, NULL, 'c'},
                                 {"version", no_argument, NULL, 'v'},
                                 {0, 0, 0, 0}};
 
     int opt;
     while ((opt = getopt_long(argc, argv, "g:d:s:hv", longopts, NULL)) != -1) {
         switch (opt) {
-        case 'c':
-            commit_when_died = 1;
-            break;
         case 'h':
             printf("%s", help_text);
             exit(0);
@@ -117,7 +112,6 @@ int main(int argc, char *argv[]) {
     }
 
     g.nfl_group_id = nfl_group_id;
-    g.commit_when_died = commit_when_died;
     g.storage_dir = storage_dir;
 
     // register signal handler
@@ -135,19 +129,15 @@ int main(int argc, char *argv[]) {
     nfl_commit_init(trunk_cnt);
 
     debug("Worker started, entries_max = %d, trunk_cnt = %d", entries_max, trunk_cnt);
-    for (i = 0;; i = (i + 1) % trunk_cnt) {
-        // will be unlocked when #i has finished receiving & committing
-        if(trunks[i])
-            pthread_mutex_lock(&(trunks[i]->lock));
-
-        nfl_state_update_or_create(&(trunks[i]), i, entries_max, &g);
-
+    for (i = 0;; i = NEXT(i, trunk_cnt)) {
+        debug("Running receiver worker: id = %d", i);
+        nfl_state_init(&(trunks[i]), i, entries_max, &g);
         pthread_create(&(trunks[i]->thread), NULL, nfl_collect_worker,
                        (void *)trunks[i]);
         // wait for current receiver worker
         pthread_join(trunks[i]->thread, NULL);
     }
-    
+
     // Won't reach here
     // We don't actually free trunks or the semaphore at all
     // sem_destroy(&nfl_commit_queue);

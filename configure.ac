@@ -14,6 +14,8 @@ AM_INIT_AUTOMAKE([-Wall -Werror foreign dist-xz])
 
 AC_PROG_CC
 
+AC_DEFINE(DEBUG)
+
 AC_CHECK_HEADERS(libnetfilter_log/libnetfilter_log.h)
 AC_SEARCH_LIBS(nflog_open, netfilter_log)
 

@@ -51,13 +51,14 @@ void nfl_cal_trunk(uint32_t total_size, uint32_t *trunk_cnt, uint32_t *trunk_siz
 	assert(trunk_cnt);
 	assert(total_size);
 
-    *trunk_cnt = CEIL_DIV(total_size, pgsize * TRUNK_SIZE_BY_PAGE);
+    *trunk_cnt = CEIL_DIV(total_size, pgsize*TRUNK_SIZE_BY_PAGE);
 	if(*trunk_cnt > MAX_TRUNK_ID) {
+        *trunk_cnt = MAX_TRUNK_ID;
 		*trunk_size = total_size / MAX_TRUNK_ID;
 		*trunk_size = (*trunk_size / pgsize) * pgsize; // align with pagesize
 	}
 	else {
-		*trunk_size = TRUNK_SIZE_BY_PAGE;
+		*trunk_size = pgsize*TRUNK_SIZE_BY_PAGE;
 	}
 }
 
