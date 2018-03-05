@@ -1,3 +1,8 @@
 bin_PROGRAMS = nfcollect nfextract
-nfcollect_SOURCES = commit.c collect.c common.c nfcollect.c
-nfextract_SOURCES = common.c extract.c nfextract.c
+
+AM_CFLAGS = \
+			-I$(top_srcdir)/include \
+			-Werror -Wall -Wno-address-of-packed-member
+
+nfcollect_SOURCES = lib/common.c lib/commit.c lib/collect.c bin/nfcollect.c
+nfextract_SOURCES = lib/common.c lib/extract.c bin/nfextract.c

@@ -8,3 +8,9 @@ autom4te.cache
 aclocal.*
 Makefile.in
 Makefile
+*.Po
+.Tpo
+*.deps
+.dirstamp
+nfcollect
+nfextract
