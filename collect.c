@@ -33,7 +33,6 @@
 
 nflog_global_t g;
 
-static void nfl_cleanup(void *nf);
 static void nfl_init(nflog_state_t *nf);
 static void *nfl_start_commit_worker(void *targs);
 static void nfl_commit(nflog_state_t *nf);
@@ -231,7 +230,7 @@ void nfl_state_init(nflog_state_t **nf,
                                                   entries_max);
 }
 
-void nfl_state_free(nflog_state_t *nf) {
+static void nfl_state_free(nflog_state_t *nf) {
     // Free only and leave the rest intact
     free((void*)nf->store);
 }

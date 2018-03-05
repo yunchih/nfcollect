@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
+#include <regex.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -27,6 +28,31 @@ int nfl_check_dir(const char *storage_dir) {
     return 0;
 }
 
+int nfl_storage_match_index(const char *fn) {
+    static regex_t regex;
+    static bool compiled = false;
+    regmatch_t match[1];
+    int ret;
+
+    if(!compiled) {
+        ERR(regcomp(&regex, "^" STORAGE_PREFIX "_[0-9]+", 0),
+                "Could not compile regex");
+        compiled = true;
+    }
+
+    ret = regexec(&regex, fn, 1, match, 0);
+    if (!ret) {
+        assert(match[0].rm_so != (size_t)-1);
+        return strtol(fn + match[0].rm_so, NULL, 10);
+    }
+    else if (ret != REG_NOMATCH) {
+        char buf[100];
+        regerror(ret, &regex, buf, sizeof(buf));
+        WARN(1, "Regex match failed: %s", buf)
+    }
+
+    return -1;
+}
 const char *nfl_get_filename(const char *dir, int id) {
     char out[1024];
     sprintf(out, "%s/" STORAGE_PREFIX "_%d", dir, id);
@@ -67,10 +93,10 @@ void nfl_cal_entries(uint32_t trunk_size, uint32_t *entries_cnt) {
     *entries_cnt = (trunk_size - sizeof(nflog_header_t)) / sizeof(nflog_entry_t);
 }
 
-const char *nfl_format_output(nflog_entry_t *entry) {
-    char out[1024], dest_ip[16];
+void nfl_format_output(char* output, nflog_entry_t *entry) {
+    char dest_ip[16];
     snprintf(dest_ip, 16, "%pI4", &entry->daddr);
-    sprintf(out,
+    sprintf(output,
           "t=%ld\t"
           "daddr=%s\t"
           "proto=%s\t"

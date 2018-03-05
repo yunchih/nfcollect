@@ -22,22 +22,24 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "commit.h"
+#include "extract.h"
 #include "common.h"
+#include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #define PROG "nfextract"
 
 sem_t nfl_commit_queue;
 uint16_t nfl_group_id;
-char *storage_dir = NULL;
 
 const char *help_text =
     "Usage: " PROG " [OPTION]\n"
@@ -48,18 +50,58 @@ const char *help_text =
     "  -v --version                 print version information\n"
     "\n";
 
-void sig_handler(int signo) {
+static void sig_handler(int signo) {
     if (signo == SIGHUP) {
         /* TODO */
     }
 }
 
+static void extract_each(const char *filename) {
+    nflog_state_t trunk;
+    if(nfl_extract_worker(filename, &trunk) < 0)
+        return;
+
+    char output[1024];
+    for(int entry = 0; entry < trunk.header->n_entries; ++entry){
+        nfl_format_output(output, trunk.store);
+        puts((char*)output);
+        free((char*)output);
+    }
+
+    free((char*)filename);
+}
+
+static void extract_all(const char *storage_dir) {
+	DIR *dp;
+	struct dirent *ep;
+    int i, index, max_index = -1;
+    char *trunk_files[MAX_TRUNK_ID];
+    memset(trunk_files, MAX_TRUNK_ID, 0);
+
+    ERR(!(dp = opendir(storage_dir)),
+            "Can't open the storage directory");
+    while ((ep = readdir(dp))) {
+        index = nfl_storage_match_index(ep->d_name);
+        if(index >= 0) {
+            if(index >= MAX_TRUNK_ID) {
+                WARN(1, "Storage trunk file index "
+                        "out of predefined range: %s", ep->d_name);
+            } else {
+                trunk_files[index] = strdup(ep->d_name);
+                if(index > max_index) max_index = index;
+            }
+        }
+    }
+
+    closedir (dp);
+
+    for(i = 0; i < max_index; ++i)
+        if(trunk_files[i])
+            extract_each(trunk_files[i]);
+}
+
 int main(int argc, char *argv[]) {
-
-    uint32_t i, max_commit_worker = 0, storage_size = 0;
-    uint32_t trunk_cnt, trunk_size, entries_max;
-    int nflog_group_id;
-
+    char *storage_dir = NULL;
     struct option longopts[] = {/* name, has_args, flag, val */
                                 {"storage_dir", required_argument, NULL, 'd'},
                                 {"help", no_argument, NULL, 'h'},
@@ -95,23 +137,6 @@ int main(int argc, char *argv[]) {
     // register signal handler
     ERR(signal(SIGHUP, sig_handler) == SIG_ERR, "Could not set SIGHUP handler");
 
-    nfl_cal_trunk(storage_size, &trunk_cnt, &trunk_size);
-    nfl_cal_entries(trunk_size, &entries_max);
-
-    nflog_state_t trunk;
-    const char *filename, *output;
-    for (int i = 0; i < trunk_cnt; ++i) {
-        filename = nfl_get_filename(storage_dir, i);
-        nfl_extract_worker(trunk.header, trunk.store, filename);
-
-        for(int entry = 0; entry < trunk.header->n_entries; ++entry){
-            output = nfl_format_output(trunk.store);
-            puts((char*)output);
-            free((char*)output);
-        }
-
-        free((char*)filename);
-    }
-
+    extract_all(storage_dir);
     return 0;
 }

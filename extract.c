@@ -1,8 +1,19 @@
 
-#include "common.h"
+#include "extract.h"
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+
+static int nfl_extract_default(FILE *f, nflog_state_t *state);
+static int nfl_extract_zstd(FILE *f, nflog_state_t *state);
+static int nfl_extract_lz4(FILE *f, nflog_state_t *state);
+
+typedef int (*nflog_extract_run_table_t)(FILE* f, nflog_state_t* state);
+static const nflog_extract_run_table_t extract_run_table[] = {
+    nfl_extract_default,
+    nfl_extract_lz4,
+    nfl_extract_zstd
+};
 
 static int nfl_verify_header(nflog_header_t *header) {
     if(header->id > MAX_TRUNK_ID)
@@ -19,24 +30,47 @@ static int nfl_verify_header(nflog_header_t *header) {
     return 0;
 }
 
-int nfl_extract_worker(nflog_header_t *header, nflog_entry_t *store, const char *filename) {
+static int nfl_extract_default(FILE *f, nflog_state_t *state) {
+    fread(state->store, state->header->n_entries, sizeof(nflog_entry_t), f);
+    WARN_RETURN(ferror(f), "%s", strerror(errno));
+    return 0;
+}
+
+static int nfl_extract_zstd(FILE *f, nflog_state_t *state) {
+    /* TODO */
+    return 0;
+}
+
+static int nfl_extract_lz4(FILE *f, nflog_state_t *state) {
+    /* TODO */
+    return 0;
+}
+
+int nfl_extract_worker(const char *filename, nflog_state_t *state) {
     FILE* f;
-    uint32_t got;
-    int i, failed = 0;
+    int got = 0, ret = 0;
+    nflog_header_t **header =  &state->header;
+    nflog_entry_t **store = &state->store;
 
     debug("Extracting from file %s", filename);
     ERR((f = fopen(filename, "rb")) == NULL, "extract worker");
     ERR(nfl_check_file(f) < 0, "extract worker");
 
     // Read header
-    got = fread(header, 1, sizeof(nflog_header_t), f);
+    ERR((*header = malloc(sizeof(nflog_header_t))), NULL);
+    got = fread(*header, 1, sizeof(nflog_header_t), f);
 
     // Check header validity
     WARN_RETURN(ferror(f), "%s", strerror(errno));
-    WARN_RETURN(nfl_verify_header(header) < 0, "File %s has corrupted header.", filename);
+    WARN_RETURN(got != sizeof(nflog_header_t) || nfl_verify_header(*header) < 0,
+            "File %s has corrupted header.", filename);
 
     // Read body
-    fread(store, header->n_entries, sizeof(nflog_entry_t), f);
-    WARN_RETURN(ferror(f), "%s", strerror(errno));
+    WARN_RETURN((*header)->compression_opt > sizeof(extract_run_table)/sizeof(extract_run_table[0]),
+        "Unknown compression in %s", filename);
+    ERR((*store = malloc(sizeof(nflog_entry_t) * (*header)->n_entries)), NULL);
+    ret = extract_run_table[(*header)->compression_opt](f, state);
     fclose(f);
+
+    return ret;
 }

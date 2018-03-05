@@ -58,19 +58,20 @@ int main(int argc, char *argv[]) {
     uint32_t trunk_cnt = 0, trunk_size = 0;
     uint32_t entries_max;
     nflog_global_t g;
-    int nfl_group_id;
-    char *storage_dir = NULL;
+    int nfl_group_id = -1;
+    char *compression_flag = NULL, *storage_dir = NULL;
 
     struct option longopts[] = {/* name, has_args, flag, val */
                                 {"nflog-group", required_argument, NULL, 'g'},
                                 {"storage_dir", required_argument, NULL, 'd'},
                                 {"storage_size", required_argument, NULL, 's'},
+                                {"compression", optional_argument, NULL, 'z'},
                                 {"help", no_argument, NULL, 'h'},
                                 {"version", no_argument, NULL, 'v'},
                                 {0, 0, 0, 0}};
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "g:d:s:hv", longopts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "c:g:d:s:hv", longopts, NULL)) != -1) {
         switch (opt) {
         case 'h':
             printf("%s", help_text);
@@ -79,6 +80,9 @@ int main(int argc, char *argv[]) {
         case 'v':
             printf("%s %s", PACKAGE, VERSION);
             exit(0);
+            break;
+        case 'c':
+            compression_flag = optarg;
             break;
         case 'd':
             storage_dir = optarg;
@@ -119,6 +123,7 @@ int main(int argc, char *argv[]) {
 
     nfl_cal_trunk(storage_size, &trunk_cnt, &trunk_size);
     nfl_cal_entries(trunk_size, &entries_max);
+    nfl_setup_compression(compression_flag, &g.compression_opt);
 
     // Set up commit worker
     g.nfl_commit_queue = malloc(sizeof(sem_t));
