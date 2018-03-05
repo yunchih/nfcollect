@@ -22,6 +22,9 @@ AC_SEARCH_LIBS(nflog_open, netfilter_log)
 AC_CHECK_HEADERS(pthread.h)
 AC_SEARCH_LIBS(pthread_create, pthread)
 
+AC_CHECK_HEADERS(zstd.h)
+AC_SEARCH_LIBS(ZSTD_compress, zstd)
+
 AC_CONFIG_FILES([Makefile])
 
 AC_OUTPUT

@@ -78,15 +78,15 @@
 #define MAX_TRUNK_ID (80)
 #define STORAGE_PREFIX "nflog_storage"
 
-enum nflog_flag_t {
-    COMPRESS_NONE = 1,
-    COMPRESS_LZ4  = 2,
-    COMPRESS_ZSTD = 4
+enum nflog_compression_t {
+    COMPRESS_NONE,
+    COMPRESS_LZ4,
+    COMPRESS_ZSTD
 };
 
 typedef struct __attribute__((packed)) _nflog_header_t {
 	uint16_t                   cksum;                /*     0     4 */
-	enum nflog_flag_t          flag;                 /*     0     4 */
+	enum nflog_compression_t   compression_opt;      /*     0     4 */
 	uint32_t                   id;                   /*     4     4 */
 	uint32_t                   n_entries;            /*     8     4 */
 	uint32_t                   max_n_entries;        /*    12     4 */
@@ -130,6 +130,7 @@ typedef struct _nflog_global_t {
     sem_t* nfl_commit_queue;
     uint16_t nfl_group_id;
     const char* storage_dir;
+    enum nflog_compression_t compression_opt;
 } nflog_global_t;
 
 typedef struct _nflog_state_t {

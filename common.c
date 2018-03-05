@@ -80,5 +80,19 @@ const char *nfl_format_output(nflog_entry_t *entry) {
           entry->timestamp, dest_ip,
           entry->protocol == IPPROTO_TCP ? "TCP" : "UDP",
           entry->uid, entry->sport, entry->dport);
-    return strdup(out);
+}
+
+int nfl_setup_compression(const char *flag, enum nflog_compression_t *opt) {
+    if(flag == NULL) {
+        *opt=COMPRESS_NONE;
+    } else if(!strcmp(flag, "zstd") || !strcmp(flag, "zstandard")) {
+        *opt=COMPRESS_ZSTD;
+    } else if(!strcmp(flag, "lz4")) {
+        *opt=COMPRESS_LZ4;
+    } else {
+        fprintf(stderr, "Unknown compression algorithm: %s\n", flag);
+        return 0;
+    }
+
+    return 1;
 }
