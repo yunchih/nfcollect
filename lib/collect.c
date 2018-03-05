@@ -24,11 +24,11 @@
 
 #include "commit.h"
 #include "common.h"
-#include <stddef.h>    // size_t for libnetfilter_log
-#include <sys/types.h> // u_int32_t for libnetfilter_log
 #include <libnetfilter_log/libnetfilter_log.h>
 #include <pthread.h>
+#include <stddef.h> // size_t for libnetfilter_log
 #include <string.h>
+#include <sys/types.h> // u_int32_t for libnetfilter_log
 #include <time.h>
 
 nflog_global_t g;
@@ -70,7 +70,7 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
         entry->dport = ntohs(tcph->dest);
 
         // only process SYNC and PSH packet, drop ACK
-        if(!tcph->syn && !tcph->psh)
+        if (!tcph->syn && !tcph->psh)
             return 1;
     } else if (iph->protocol == IPPROTO_UDP) {
         udph = (struct udphdr *)inner_hdr;
@@ -98,10 +98,10 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
           "uid:\t%d,\t"
           "sport:\t%d,\t"
           "dport:\t%d",
-          nf->header->n_entries,
-          entry->timestamp, (unsigned long)entry->daddr.s_addr,
-          iph->protocol == IPPROTO_TCP ? "TCP" : "UDP",
-          entry->uid, entry->sport, entry->dport);
+          nf->header->n_entries, entry->timestamp,
+          (unsigned long)entry->daddr.s_addr,
+          iph->protocol == IPPROTO_TCP ? "TCP" : "UDP", entry->uid,
+          entry->sport, entry->dport);
 
     // Ignore IPv6 packet for now Q_Q
     return 0;
@@ -118,8 +118,10 @@ static void nfl_init(nflog_state_t *nf) {
     // bind to group
     nf->nfl_group_fd = nflog_bind_group(nf->nfl_fd, nf->global->nfl_group_id);
 
-    /* ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, sizeof(struct iphdr) + 4) < 0, */
-    ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nflog_recv_size) < 0,
+    /* ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, sizeof(struct
+     * iphdr) + 4) < 0, */
+    ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nflog_recv_size) <
+            0,
         "Could not set copy mode");
 
     nflog_callback_register(nf->nfl_group_fd, &handle_packet, nf);
@@ -139,17 +141,19 @@ void *nfl_collect_worker(void *targs) {
     debug("Recv worker #%u: main loop starts", nf->header->id);
     time(&nf->header->start_time);
 
-    int rv; char buf[4096];
+    int rv;
+    char buf[4096];
     while (*p_cnt_now < cnt_max) {
         pthread_testcancel(); /* cancellation point */
         if ((rv = recv(fd, buf, sizeof(buf), 0)) && rv > 0) {
-            debug("Recv worker #%u: nflog packet received (len=%u)", nf->header->id,
-                  rv);
+            debug("Recv worker #%u: nflog packet received (len=%u)",
+                  nf->header->id, rv);
             nflog_handle_packet(nf->nfl_fd, buf, rv);
         }
     }
 
-    debug("Recv worker #%u: finish recv, received packets: %u", nf->header->id, cnt_max);
+    debug("Recv worker #%u: finish recv, received packets: %u", nf->header->id,
+          cnt_max);
 
     // write end time
     time(&nf->header->end_time);
@@ -172,7 +176,7 @@ static void nfl_commit(nflog_state_t *nf) {
 }
 
 static void *nfl_start_commit_worker(void *targs) {
-    nflog_state_t* nf = (nflog_state_t*) targs;
+    nflog_state_t *nf = (nflog_state_t *)targs;
     const char *filename = nfl_get_filename(g.storage_dir, nf->header->id);
     debug("Comm worker #%u: thread started.", nf->header->id);
 
@@ -183,7 +187,7 @@ static void *nfl_start_commit_worker(void *targs) {
     sem_post(g.nfl_commit_queue);
 
     nfl_state_free(nf);
-    free((char*)filename);
+    free((char *)filename);
 
     pthread_mutex_lock(&nf->has_finished_lock);
     nf->has_finished = true;
@@ -197,11 +201,10 @@ static void *nfl_start_commit_worker(void *targs) {
  * State managers
  */
 
-void nfl_state_init(nflog_state_t **nf,
-                                uint32_t id, uint32_t entries_max,
-                                nflog_global_t *g) {
+void nfl_state_init(nflog_state_t **nf, uint32_t id, uint32_t entries_max,
+                    nflog_global_t *g) {
     assert(nf);
-    if(unlikely(*nf == NULL)) {
+    if (unlikely(*nf == NULL)) {
         *nf = (nflog_state_t *)malloc(sizeof(nflog_state_t));
         (*nf)->global = g;
         (*nf)->header = (nflog_header_t *)malloc(sizeof(nflog_header_t));
@@ -214,11 +217,14 @@ void nfl_state_init(nflog_state_t **nf,
         pthread_cond_init(&(*nf)->has_finished_cond, NULL);
     }
 
-    // Ensure trunk with same id in previous run has finished to prevent reusing a trunk
-    // which it's still being used.  Furthermore, this hopefully alleviate us from
+    // Ensure trunk with same id in previous run has finished to prevent reusing
+    // a trunk
+    // which it's still being used.  Furthermore, this hopefully alleviate us
+    // from
     // bursty network traffic.
     pthread_mutex_lock(&(*nf)->has_finished_lock);
-    while(!(*nf)->has_finished) pthread_cond_wait(&(*nf)->has_finished_cond, &(*nf)->has_finished_lock);
+    while (!(*nf)->has_finished)
+        pthread_cond_wait(&(*nf)->has_finished_cond, &(*nf)->has_finished_lock);
     (*nf)->has_finished = false;
     pthread_mutex_unlock(&(*nf)->has_finished_lock);
 
@@ -226,11 +232,10 @@ void nfl_state_init(nflog_state_t **nf,
     // consume physical memory before we fill the buffer.
     // Instead, fill entries with 0 on the fly, to squeeze
     // more space for compression.
-    (*nf)->store = (nflog_entry_t *)malloc(sizeof(nflog_entry_t) *
-                                                  entries_max);
+    (*nf)->store = (nflog_entry_t *)malloc(sizeof(nflog_entry_t) * entries_max);
 }
 
 static void nfl_state_free(nflog_state_t *nf) {
     // Free only and leave the rest intact
-    free((void*)nf->store);
+    free((void *)nf->store);
 }

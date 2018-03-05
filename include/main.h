@@ -24,14 +24,14 @@
 #ifndef _MAIN_H
 #define _MAIN_H
 #include <assert.h>
-#include <semaphore.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#include <semaphore.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #ifdef DEBUG
 #define DEBUG_ON 1
@@ -40,102 +40,96 @@
 #endif
 
 #define ASSERT(condition, error_msg)                                           \
-  if (!(condition)) {                                                          \
-    fputs((error_msg), stderr);                                                \
-    exit(1);                                                                   \
-  }
+    if (!(condition)) {                                                        \
+        fputs((error_msg), stderr);                                            \
+        exit(1);                                                               \
+    }
 
 #define ERR(command, error_msg)                                                \
-  if (command) {                                                               \
-    perror((error_msg));                                                       \
-    exit(1);                                                                   \
-  }
+    if (command) {                                                             \
+        perror((error_msg));                                                   \
+        exit(1);                                                               \
+    }
 
 #define WARN(command, format, ...)                                             \
-  if (command) {                                                               \
-    fprintf(stdout, format "\n", ##__VA_ARGS__);                               \
-  }
+    if (command) {                                                             \
+        fprintf(stdout, format "\n", ##__VA_ARGS__);                           \
+    }
 
 #define WARN_RETURN(command, format, ...)                                      \
-  if (command) {                                                               \
-    fprintf(stdout, format "\n", ##__VA_ARGS__);                               \
-    return -1;                                                                 \
-  }
+    if (command) {                                                             \
+        fprintf(stdout, format "\n", ##__VA_ARGS__);                           \
+        return -1;                                                             \
+    }
 
 #define debug(format, ...)                                                     \
-  if (DEBUG_ON) {                                                              \
-    fprintf(stdout, "[DEBUG] " format "\n", ##__VA_ARGS__);                    \
-  }
+    if (DEBUG_ON) {                                                            \
+        fprintf(stdout, "[DEBUG] " format "\n", ##__VA_ARGS__);                \
+    }
 
-#define likely(x)    __builtin_expect((x),1)
-#define unlikely(x)  __builtin_expect((x),0)
+#define likely(x) __builtin_expect((x), 1)
+#define unlikely(x) __builtin_expect((x), 0)
 
-#define CEIL_DIV(a,b) (((a)+(b) - 1)/(b))
-#define NEXT(i, l) ((i+1) % l)
-#define PREV(i, l) ((i-1) % l)
+#define CEIL_DIV(a, b) (((a) + (b)-1) / (b))
+#define NEXT(i, l) ((i + 1) % l)
+#define PREV(i, l) ((i - 1) % l)
 #define TRUNK_SIZE_BY_PAGE (150) // 150 pages
 #define MAX_TRUNK_ID (80)
 #define STORAGE_PREFIX "nflog_storage"
 
-enum nflog_compression_t {
-    COMPRESS_NONE,
-    COMPRESS_LZ4,
-    COMPRESS_ZSTD
-};
+enum nflog_compression_t { COMPRESS_NONE, COMPRESS_LZ4, COMPRESS_ZSTD };
 
 typedef struct __attribute__((packed)) _nflog_header_t {
-	uint16_t                   cksum;                /*     0     4 */
-	enum nflog_compression_t   compression_opt;      /*     0     4 */
-	uint32_t                   id;                   /*     4     4 */
-	uint32_t                   n_entries;            /*     8     4 */
-	uint32_t                   max_n_entries;        /*    12     4 */
-	time_t                     start_time;           /*    16     8 */
-	time_t                     end_time;             /*    24     8 */
+    uint16_t cksum;                           /*     0     4 */
+    enum nflog_compression_t compression_opt; /*     0     4 */
+    uint32_t id;                              /*     4     4 */
+    uint32_t n_entries;                       /*     8     4 */
+    uint32_t max_n_entries;                   /*    12     4 */
+    time_t start_time;                        /*    16     8 */
+    time_t end_time;                          /*    24     8 */
 
-	/* size: 32, cachelines: 1, members: 6 */
+    /* size: 32, cachelines: 1, members: 6 */
 } nflog_header_t;
 
-
 typedef struct __attribute__((packed)) _nflog_entry_t {
-	// current timestamp since UNIX epoch
-	time_t                     timestamp;            /*     0     8 */
+    // current timestamp since UNIX epoch
+    time_t timestamp; /*     0     8 */
 
- 	// dest address
-	struct in_addr             daddr;                /*     8     4 */
+    // dest address
+    struct in_addr daddr; /*     8     4 */
 
-	// uid
-	uint32_t                   uid;                  /*    12     4 */
+    // uid
+    uint32_t uid; /*    12     4 */
 
-	// unused space, just for padding
-	uint8_t                    __unused1;            /*    16     1 */
+    // unused space, just for padding
+    uint8_t __unused1; /*    16     1 */
 
- 	// IP protocol (UDP or TCP)
-	uint8_t                    protocol;             /*    17     1 */
+    // IP protocol (UDP or TCP)
+    uint8_t protocol; /*    17     1 */
 
-	// unused space, just for padding
-	uint16_t                   __unused2;            /*    18     2 */
+    // unused space, just for padding
+    uint16_t __unused2; /*    18     2 */
 
-	// source port
-	uint16_t                   sport;                /*    20     2 */
+    // source port
+    uint16_t sport; /*    20     2 */
 
-	// destination port
-	uint16_t                   dport;                /*    22     2 */
+    // destination port
+    uint16_t dport; /*    22     2 */
 
-	/* size: 24, cachelines: 1, members: 8 */
+    /* size: 24, cachelines: 1, members: 8 */
 } nflog_entry_t;
 
-
 typedef struct _nflog_global_t {
-    sem_t* nfl_commit_queue;
+    sem_t *nfl_commit_queue;
     uint16_t nfl_group_id;
-    const char* storage_dir;
+    const char *storage_dir;
     enum nflog_compression_t compression_opt;
 } nflog_global_t;
 
 typedef struct _nflog_state_t {
-    nflog_global_t* global;
-    nflog_header_t* header;
-    nflog_entry_t* store;
+    nflog_global_t *global;
+    nflog_header_t *header;
+    nflog_entry_t *store;
 
     struct nflog_handle *nfl_fd;
     struct nflog_g_handle *nfl_group_fd;

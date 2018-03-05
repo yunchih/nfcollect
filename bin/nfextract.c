@@ -22,8 +22,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "extract.h"
 #include "common.h"
+#include "extract.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -58,45 +58,46 @@ static void sig_handler(int signo) {
 
 static void extract_each(const char *filename) {
     nflog_state_t trunk;
-    if(nfl_extract_worker(filename, &trunk) < 0)
+    if (nfl_extract_worker(filename, &trunk) < 0)
         return;
 
     char output[1024];
-    for(int entry = 0; entry < trunk.header->n_entries; ++entry){
+    for (int entry = 0; entry < trunk.header->n_entries; ++entry) {
         nfl_format_output(output, trunk.store);
-        puts((char*)output);
-        free((char*)output);
+        puts((char *)output);
+        free((char *)output);
     }
 
-    free((char*)filename);
+    free((char *)filename);
 }
 
 static void extract_all(const char *storage_dir) {
-	DIR *dp;
-	struct dirent *ep;
+    DIR *dp;
+    struct dirent *ep;
     int i, index, max_index = -1;
     char *trunk_files[MAX_TRUNK_ID];
     memset(trunk_files, MAX_TRUNK_ID, 0);
 
-    ERR(!(dp = opendir(storage_dir)),
-            "Can't open the storage directory");
+    ERR(!(dp = opendir(storage_dir)), "Can't open the storage directory");
     while ((ep = readdir(dp))) {
         index = nfl_storage_match_index(ep->d_name);
-        if(index >= 0) {
-            if(index >= MAX_TRUNK_ID) {
+        if (index >= 0) {
+            if (index >= MAX_TRUNK_ID) {
                 WARN(1, "Storage trunk file index "
-                        "out of predefined range: %s", ep->d_name);
+                        "out of predefined range: %s",
+                     ep->d_name);
             } else {
                 trunk_files[index] = strdup(ep->d_name);
-                if(index > max_index) max_index = index;
+                if (index > max_index)
+                    max_index = index;
             }
         }
     }
 
-    closedir (dp);
+    closedir(dp);
 
-    for(i = 0; i < max_index; ++i)
-        if(trunk_files[i])
+    for (i = 0; i < max_index; ++i)
+        if (trunk_files[i])
             extract_each(trunk_files[i]);
 }
 

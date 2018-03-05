@@ -23,9 +23,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include "collect.h"
 #include "commit.h"
 #include "common.h"
-#include "collect.h"
 #include <fcntl.h>
 #include <getopt.h>
 #include <pthread.h>
@@ -71,7 +71,8 @@ int main(int argc, char *argv[]) {
                                 {0, 0, 0, 0}};
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "c:g:d:s:hv", longopts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "c:g:d:s:hv", longopts, NULL)) !=
+           -1) {
         switch (opt) {
         case 'h':
             printf("%s", help_text);
@@ -130,10 +131,12 @@ int main(int argc, char *argv[]) {
     sem_init(g.nfl_commit_queue, 0, max_commit_worker);
 
     // Set up nflog receiver worker
-    nflog_state_t **trunks = (nflog_state_t **)calloc(trunk_cnt, sizeof(void*));
+    nflog_state_t **trunks =
+        (nflog_state_t **)calloc(trunk_cnt, sizeof(void *));
     nfl_commit_init(trunk_cnt);
 
-    debug("Worker started, entries_max = %d, trunk_cnt = %d", entries_max, trunk_cnt);
+    debug("Worker started, entries_max = %d, trunk_cnt = %d", entries_max,
+          trunk_cnt);
     for (i = 0;; i = NEXT(i, trunk_cnt)) {
         debug("Running receiver worker: id = %d", i);
         nfl_state_init(&(trunks[i]), i, entries_max, &g);
