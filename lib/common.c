@@ -65,7 +65,7 @@ uint32_t nfl_header_cksum(nflog_header_t *header) {
     s += header->n_entries;
     s ^= header->start_time;
     s += header->end_time;
-    s &= ULONG_MAX;
+    s &= UINT_MAX;
     return s;
 }
 

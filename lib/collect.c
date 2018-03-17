@@ -182,7 +182,7 @@ static void *nfl_start_commit_worker(void *targs) {
 
     sem_wait(g.nfl_commit_queue);
     debug("Comm worker #%u: commit started.", nf->header->id);
-    nfl_commit_worker(nf->header, nf->store, filename);
+    nfl_commit_worker(nf->header, nf->store, g.compression_opt, filename);
     debug("Comm worker #%u: commit done.", nf->header->id);
     sem_post(g.nfl_commit_queue);
 
@@ -209,8 +209,9 @@ void nfl_state_init(nflog_state_t **nf, uint32_t id, uint32_t entries_max,
         (*nf)->global = g;
         (*nf)->header = (nflog_header_t *)malloc(sizeof(nflog_header_t));
         (*nf)->header->id = id;
-        (*nf)->header->max_n_entries = entries_max;
         (*nf)->header->n_entries = 0;
+        (*nf)->header->max_n_entries = entries_max;
+        (*nf)->header->compression_opt = g->compression_opt;
 
         (*nf)->has_finished = true;
         pthread_mutex_init(&(*nf)->has_finished_lock, NULL);
@@ -218,10 +219,8 @@ void nfl_state_init(nflog_state_t **nf, uint32_t id, uint32_t entries_max,
     }
 
     // Ensure trunk with same id in previous run has finished to prevent reusing
-    // a trunk
-    // which it's still being used.  Furthermore, this hopefully alleviate us
-    // from
-    // bursty network traffic.
+    // a trunk which it's still being used.  Furthermore, this hopefully alleviate us
+    // from bursty network traffic.
     pthread_mutex_lock(&(*nf)->has_finished_lock);
     while (!(*nf)->has_finished)
         pthread_cond_wait(&(*nf)->has_finished_cond, &(*nf)->has_finished_lock);
@@ -236,6 +235,6 @@ void nfl_state_init(nflog_state_t **nf, uint32_t id, uint32_t entries_max,
 }
 
 static void nfl_state_free(nflog_state_t *nf) {
-    // Free only and leave the rest intact
+    // Free only packet store and leave the rest intact
     free((void *)nf->store);
 }

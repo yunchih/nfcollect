@@ -51,6 +51,12 @@
         exit(1);                                                               \
     }
 
+#define FATAL(format, ...)                                                     \
+    do {                                                                       \
+        fprintf(stdout, "Error: " format "\n", ##__VA_ARGS__);                 \
+        exit(1);                                                               \
+    } while(0)
+
 #define WARN(command, format, ...)                                             \
     if (command) {                                                             \
         fprintf(stdout, format "\n", ##__VA_ARGS__);                           \
@@ -78,17 +84,17 @@
 #define STORAGE_PREFIX "nflog_storage"
 
 enum nflog_compression_t { COMPRESS_NONE, COMPRESS_LZ4, COMPRESS_ZSTD };
-
 typedef struct __attribute__((packed)) _nflog_header_t {
-    uint16_t cksum;                           /*     0     4 */
-    enum nflog_compression_t compression_opt; /*     0     4 */
-    uint32_t id;                              /*     4     4 */
-    uint32_t n_entries;                       /*     8     4 */
-    uint32_t max_n_entries;                   /*    12     4 */
-    time_t start_time;                        /*    16     8 */
-    time_t end_time;                          /*    24     8 */
+    uint32_t                   id;                   /*     0     4 */
+    uint32_t                   n_entries;            /*     4     4 */
+    uint32_t                   max_n_entries;        /*     8     4 */
+    uint32_t                   cksum;                /*    12     4 */
+    enum nflog_compression_t   compression_opt;      /*    16     4 */
+    time_t                     start_time;           /*    20     8 */
+    time_t                     end_time;             /*    28     8 */
 
-    /* size: 32, cachelines: 1, members: 6 */
+    /* size: 36, cachelines: 1, members: 7 */
+    /* last cacheline: 36 bytes */
 } nflog_header_t;
 
 typedef struct __attribute__((packed)) _nflog_entry_t {

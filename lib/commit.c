@@ -8,11 +8,6 @@ static void nfl_commit_default(FILE *f, nflog_entry_t *store,
 static void nfl_commit_lz4(FILE *f, nflog_entry_t *store, uint32_t store_size);
 static void nfl_commit_zstd(FILE *f, nflog_entry_t *store, uint32_t store_size);
 
-typedef void (*nflog_commit_run_table_t)(FILE *f, nflog_entry_t *store,
-                                         uint32_t size);
-static const nflog_commit_run_table_t commit_run_table[] = {
-    nfl_commit_default, nfl_commit_lz4, nfl_commit_zstd};
-
 void nfl_commit_init() { /* TODO */ }
 
 static void nfl_commit_default(FILE *f, nflog_entry_t *store,
@@ -31,19 +26,17 @@ static void nfl_commit_zstd(FILE *f, nflog_entry_t *store,
     size_t const bufsize = ZSTD_compressBound(store_size);
     void *buf;
 
-    ERR((buf = malloc(bufsize)), NULL);
-
+    ERR(!(buf = malloc(bufsize)), "zstd: cannot malloc");
     size_t const csize = ZSTD_compress(buf, bufsize, store, store_size, 1);
-    if (ZSTD_isError(csize)) {
-        fprintf(stderr, "zstd error: %s \n", ZSTD_getErrorName(csize));
-        exit(8);
-    }
+    if (ZSTD_isError(csize))
+        FATAL("zstd: %s \n", ZSTD_getErrorName(csize));
 
-    nfl_commit_default(f, buf, bufsize);
+    nfl_commit_default(f, buf, csize);
     free(buf);
 }
 
 void nfl_commit_worker(nflog_header_t *header, nflog_entry_t *store,
+                       enum nflog_compression_t compression_opt,
                        const char *filename) {
     FILE *f;
     uint32_t written;
@@ -57,7 +50,22 @@ void nfl_commit_worker(nflog_header_t *header, nflog_entry_t *store,
 
     // commit store
     uint32_t store_size = sizeof(nflog_entry_t) * header->max_n_entries;
-    commit_run_table[header->compression_opt](f, store, store_size);
+    switch(compression_opt) {
+        case COMPRESS_NONE:
+            debug("Comm worker #%u: commit without compression\n", header->id)
+            nfl_commit_default(f, store, store_size);
+            break;
+        case COMPRESS_LZ4:
+            debug("Comm worker #%u: commit with compression algorithm: lz4", header->id)
+            nfl_commit_lz4(f, store, store_size);
+            break;
+        case COMPRESS_ZSTD:
+            debug("Comm worker #%u: commit with compression algorithm: zstd", header->id)
+            nfl_commit_zstd(f, store, store_size);
+            break;
+        // Must not reach here ...
+        default: FATAL("Unknown compression option detected");
+    }
 
     // Do fsync ?
     fclose(f);
