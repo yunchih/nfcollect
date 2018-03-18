@@ -56,10 +56,18 @@ static void sig_handler(int signo) {
     }
 }
 
-static void extract_each(const char *filename) {
+static void extract_each(const char *storage_dir, const char *filename) {
     nflog_state_t trunk;
-    if (nfl_extract_worker(filename, &trunk) < 0)
+
+    // Build full path
+    char *fullpath = malloc(strlen(storage_dir) + strlen(filename) + 2);
+    sprintf(fullpath, "%s/%s", storage_dir, filename);
+
+    debug("Extracting storage file: %s", fullpath);
+    if (nfl_extract_worker(fullpath, &trunk) < 0)
         return;
+
+    free(fullpath);
 
     char output[1024];
     for (int entry = 0; entry < trunk.header->n_entries; ++entry) {
@@ -67,8 +75,6 @@ static void extract_each(const char *filename) {
         puts((char *)output);
         free((char *)output);
     }
-
-    free((char *)filename);
 }
 
 static void extract_all(const char *storage_dir) {
@@ -82,6 +88,7 @@ static void extract_all(const char *storage_dir) {
     while ((ep = readdir(dp))) {
         index = nfl_storage_match_index(ep->d_name);
         if (index >= 0) {
+            debug("Storage file %s matches with index %d", ep->d_name, index);
             if (index >= MAX_TRUNK_ID) {
                 WARN(1, "Storage trunk file index "
                         "out of predefined range: %s",
@@ -96,9 +103,11 @@ static void extract_all(const char *storage_dir) {
 
     closedir(dp);
 
-    for (i = 0; i < max_index; ++i)
+    for (i = 0; i < max_index; ++i) {
         if (trunk_files[i])
-            extract_each(trunk_files[i]);
+            extract_each(storage_dir, trunk_files[i]);
+        free(trunk_files[i]);
+    }
 }
 
 int main(int argc, char *argv[]) {
