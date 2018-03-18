@@ -79,8 +79,7 @@
 #define CEIL_DIV(a, b) (((a) + (b)-1) / (b))
 #define NEXT(i, l) ((i + 1) % l)
 #define PREV(i, l) ((i - 1) % l)
-// #define TRUNK_SIZE_BY_PAGE (150) // 150 pages
-#define TRUNK_SIZE_BY_PAGE (2) // 150 pages
+#define TRUNK_SIZE_BY_PAGE (150) // 150 pages
 #define MAX_TRUNK_ID (80)
 #define STORAGE_PREFIX "nflog_storage"
 
