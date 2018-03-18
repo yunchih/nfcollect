@@ -39,9 +39,11 @@ const char *help_text =
     "Usage: " PACKAGE " [OPTION]\n"
     "\n"
     "Options:\n"
+    "  -c --compression=<algo>      compression algorithm to use (default: no compression)\n"
     "  -d --storage_dir=<dirname>   log files storage directory\n"
     "  -h --help                    print this help\n"
     "  -g --nflog-group=<id>        the group id to collect\n"
+    "  -p --parallelism=<num>       max number of committer thread\n"
     "  -s --storage_size=<dirsize>  log files maximum total size in MiB\n"
     "  -v --version                 print version information\n"
     "\n";
@@ -66,12 +68,13 @@ int main(int argc, char *argv[]) {
                                 {"storage_dir", required_argument, NULL, 'd'},
                                 {"storage_size", required_argument, NULL, 's'},
                                 {"compression", optional_argument, NULL, 'z'},
+                                {"parallelism", optional_argument, NULL, 'p'},
                                 {"help", no_argument, NULL, 'h'},
                                 {"version", no_argument, NULL, 'v'},
                                 {0, 0, 0, 0}};
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "c:g:d:s:hv", longopts, NULL)) !=
+    while ((opt = getopt_long(argc, argv, "c:g:d:s:hvp:", longopts, NULL)) !=
            -1) {
         switch (opt) {
         case 'h':
@@ -90,6 +93,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'g':
             nfl_group_id = atoi(optarg);
+            break;
+        case 'p':
+            max_commit_worker = atoi(optarg);
             break;
         case 's':
             storage_size = atoi(optarg);
