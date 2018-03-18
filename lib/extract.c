@@ -76,7 +76,7 @@ int nfl_extract_worker(const char *filename, nfl_state_t *state) {
 
     debug("Extracting from file %s", filename);
     ERR((f = fopen(filename, "rb")) == NULL, "extract worker");
-    /* ERR(nfl_check_file(f) < 0, "extract worker"); */
+    ERR(nfl_check_file(f) < 0, "extract worker");
 
     // Read header
     ERR(!(state->header = malloc(sizeof(nfl_header_t))),
