@@ -107,7 +107,8 @@ void nfl_cal_entries(uint32_t trunk_size, uint32_t *entries_cnt) {
 }
 
 void nfl_format_output(char *output, nflog_entry_t *entry) {
-    sprintf(output, "t=%ld\t"
+    sprintf(output, "  "
+                    "t=%ld\t"
                     "daddr=%s\t"
                     "proto=%s\t"
                     "uid=%d\t"

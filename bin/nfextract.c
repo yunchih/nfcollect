@@ -70,8 +70,8 @@ static void extract_each(const char *storage_dir, const char *filename) {
     free(fullpath);
 
     char output[1024];
-    for (int entry = 0; entry < trunk.header->n_entries; ++entry) {
-        nfl_format_output(output, trunk.store);
+    for (int i = 0; i < trunk.header->n_entries; ++i) {
+        nfl_format_output(output, &trunk.store[i]);
         puts((char *)output);
     }
 }
