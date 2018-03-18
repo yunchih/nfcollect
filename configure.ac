@@ -17,7 +17,17 @@ AC_CONFIG_SRCDIR([bin/nfcollect.c])
 
 AC_PROG_CC([clang])
 
-AC_DEFINE([DEBUG], [1], [Enable debug])
+# AC_DEFINE([DEBUG], [1], [Enable debug])
+AC_ARG_ENABLE(debug,
+AC_HELP_STRING([--enable-debug],[Enable debug mode (default is NO)]),
+[case "${enableval}" in
+	yes) debug=true ;;
+	no) debug=false ;;
+	*) AC_MSG_ERROR(bad_value ${enableval} for --enable-debug) ;;
+esac],[debug=false])
+if test x"$debug" = x"true"; then
+   AC_DEFINE(DEBUG, 1, [debug])
+fi
 
 AC_CHECK_HEADERS(libnetfilter_log/libnetfilter_log.h)
 AC_SEARCH_LIBS(nflog_open, netfilter_log)

@@ -1,6 +1,16 @@
 # nfcollect
 
-Collect NFLOG log entries and commit them to stable storage in binary (compressed) format
+Collect Netfilter NFLOG log entries and commit them to stable storage in binary (compressed) format.
+
+## Build
+
+```bash
+./bootstrap.sh
+./configure
+make
+```
+
+Run `./configure --enable-debug` to enable debug output.
 
 ### References
 
