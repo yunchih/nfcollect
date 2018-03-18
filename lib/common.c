@@ -58,6 +58,15 @@ const char *nfl_get_filename(const char *dir, int id) {
     return strdup(out);
 }
 
+uint32_t nfl_get_filesize(FILE *f) {
+    uint32_t size, prepos;
+    prepos = ftell(f);
+    fseek(f, 0, SEEK_END);
+    size = ftell(f);
+    fseek(f, prepos, SEEK_SET);
+    return size;
+}
+
 uint32_t nfl_header_cksum(nflog_header_t *header) {
     register uint64_t s = 3784672181;
     s += header->id;
