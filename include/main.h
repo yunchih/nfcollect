@@ -89,7 +89,7 @@ typedef struct __attribute__((packed)) _nfl_header_t {
     uint32_t                   n_entries;            /*     4     4 */
     uint32_t                   max_n_entries;        /*     8     4 */
     uint32_t                   cksum;                /*    12     4 */
-    enum nfl_compression_t   compression_opt;      /*    16     4 */
+    enum nfl_compression_t     compression_opt;      /*    16     4 */
     time_t                     start_time;           /*    20     8 */
     time_t                     end_time;             /*    28     8 */
 
@@ -99,28 +99,28 @@ typedef struct __attribute__((packed)) _nfl_header_t {
 
 typedef struct __attribute__((packed)) _nfl_entry_t {
     // current timestamp since UNIX epoch
-    time_t timestamp; /*     0     8 */
+    time_t timestamp;           /*     0     8 */
 
     // dest address
-    struct in_addr daddr; /*     8     4 */
+    struct in_addr daddr;       /*     8     4 */
 
     // uid
-    uint32_t uid; /*    12     4 */
+    uint32_t uid;               /*    12     4 */
 
     // unused space, just for padding
-    uint8_t __unused1; /*    16     1 */
+    uint8_t __unused1;          /*    16     1 */
 
     // IP protocol (UDP or TCP)
-    uint8_t protocol; /*    17     1 */
+    uint8_t protocol;           /*    17     1 */
 
     // unused space, just for padding
-    uint16_t __unused2; /*    18     2 */
+    uint16_t __unused2;         /*    18     2 */
 
     // source port
-    uint16_t sport; /*    20     2 */
+    uint16_t sport;             /*    20     2 */
 
     // destination port
-    uint16_t dport; /*    22     2 */
+    uint16_t dport;             /*    22     2 */
 
     /* size: 24, cachelines: 1, members: 8 */
 } nfl_entry_t;

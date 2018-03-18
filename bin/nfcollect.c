@@ -39,7 +39,8 @@ const char *help_text =
     "Usage: " PACKAGE " [OPTION]\n"
     "\n"
     "Options:\n"
-    "  -c --compression=<algo>      compression algorithm to use (default: no compression)\n"
+    "  -c --compression=<algo>      compression algorithm to use (default: no "
+    "compression)\n"
     "  -d --storage_dir=<dirname>   log files storage directory\n"
     "  -h --help                    print this help\n"
     "  -g --nflog-group=<id>        the group id to collect\n"
@@ -137,8 +138,7 @@ int main(int argc, char *argv[]) {
     sem_init(g.nfl_commit_queue, 0, max_commit_worker);
 
     // Set up nflog receiver worker
-    nfl_state_t **trunks =
-        (nfl_state_t **)calloc(trunk_cnt, sizeof(void *));
+    nfl_state_t **trunks = (nfl_state_t **)calloc(trunk_cnt, sizeof(void *));
     nfl_commit_init(trunk_cnt);
 
     debug("Worker started, entries_max = %d, trunk_cnt = %d", entries_max,
