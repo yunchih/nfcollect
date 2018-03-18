@@ -57,7 +57,7 @@ static void sig_handler(int signo) {
 }
 
 static void extract_each(const char *storage_dir, const char *filename) {
-    nflog_state_t trunk;
+    nfl_state_t trunk;
 
     // Build full path
     char *fullpath = malloc(strlen(storage_dir) + strlen(filename) + 2);

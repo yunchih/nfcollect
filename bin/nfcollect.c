@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     uint32_t i, max_commit_worker = 0, storage_size = 0;
     uint32_t trunk_cnt = 0, trunk_size = 0;
     uint32_t entries_max;
-    nflog_global_t g;
+    nfl_global_t g;
     int nfl_group_id = -1;
     char *compression_flag = NULL, *storage_dir = NULL;
 
@@ -131,8 +131,8 @@ int main(int argc, char *argv[]) {
     sem_init(g.nfl_commit_queue, 0, max_commit_worker);
 
     // Set up nflog receiver worker
-    nflog_state_t **trunks =
-        (nflog_state_t **)calloc(trunk_cnt, sizeof(void *));
+    nfl_state_t **trunks =
+        (nfl_state_t **)calloc(trunk_cnt, sizeof(void *));
     nfl_commit_init(trunk_cnt);
 
     debug("Worker started, entries_max = %d, trunk_cnt = %d", entries_max,

@@ -31,17 +31,17 @@
 #include <sys/types.h> // u_int32_t for libnetfilter_log
 #include <time.h>
 
-nflog_global_t g;
+nfl_global_t g;
 
-static void nfl_init(nflog_state_t *nf);
+static void nfl_init(nfl_state_t *nf);
 static void *nfl_start_commit_worker(void *targs);
-static void nfl_commit(nflog_state_t *nf);
-static void nfl_state_free(nflog_state_t *nf);
+static void nfl_commit(nfl_state_t *nf);
+static void nfl_state_free(nfl_state_t *nf);
 
 static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
                          struct nflog_data *nfa, void *_nf) {
     register const struct iphdr *iph;
-    register nflog_entry_t *entry;
+    register nfl_entry_t *entry;
     const struct tcphdr *tcph;
     const struct udphdr *udph;
     char *payload;
@@ -49,7 +49,7 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
     uint32_t uid;
 
     int payload_len = nflog_get_payload(nfa, &payload);
-    nflog_state_t *nf = (nflog_state_t *)_nf;
+    nfl_state_t *nf = (nfl_state_t *)_nf;
 
     pthread_testcancel(); /* cancellation point */
 
@@ -107,7 +107,7 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
     return 0;
 }
 
-static void nfl_init(nflog_state_t *nf) {
+static void nfl_init(nfl_state_t *nf) {
     // open nflog
     ERR((nf->nfl_fd = nflog_open()) == NULL, "nflog_open")
     debug("Opening nflog communication file descriptor");
@@ -120,18 +120,18 @@ static void nfl_init(nflog_state_t *nf) {
 
     /* ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, sizeof(struct
      * iphdr) + 4) < 0, */
-    ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nflog_recv_size) <
+    ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nfl_recv_size) <
             0,
         "Could not set copy mode");
 
     nflog_callback_register(nf->nfl_group_fd, &handle_packet, nf);
     debug("Registering nflog callback");
 
-    memcpy(&g, nf->global, sizeof(nflog_global_t));
+    memcpy(&g, nf->global, sizeof(nfl_global_t));
 }
 
 void *nfl_collect_worker(void *targs) {
-    nflog_state_t *nf = (nflog_state_t *)targs;
+    nfl_state_t *nf = (nfl_state_t *)targs;
     nfl_init(nf);
 
     int fd = nflog_fd(nf->nfl_fd);
@@ -172,14 +172,14 @@ void *nfl_collect_worker(void *targs) {
  * Committer
  */
 
-static void nfl_commit(nflog_state_t *nf) {
+static void nfl_commit(nfl_state_t *nf) {
     pthread_t tid;
     pthread_create(&tid, NULL, nfl_start_commit_worker, (void *)nf);
     pthread_detach(tid);
 }
 
 static void *nfl_start_commit_worker(void *targs) {
-    nflog_state_t *nf = (nflog_state_t *)targs;
+    nfl_state_t *nf = (nfl_state_t *)targs;
     const char *filename = nfl_get_filename(g.storage_dir, nf->header->id);
     debug("Comm worker #%u: thread started.", nf->header->id);
 
@@ -204,13 +204,13 @@ static void *nfl_start_commit_worker(void *targs) {
  * State managers
  */
 
-void nfl_state_init(nflog_state_t **nf, uint32_t id, uint32_t entries_max,
-                    nflog_global_t *g) {
+void nfl_state_init(nfl_state_t **nf, uint32_t id, uint32_t entries_max,
+                    nfl_global_t *g) {
     assert(nf);
     if (unlikely(*nf == NULL)) {
-        *nf = (nflog_state_t *)malloc(sizeof(nflog_state_t));
+        *nf = (nfl_state_t *)malloc(sizeof(nfl_state_t));
         (*nf)->global = g;
-        (*nf)->header = (nflog_header_t *)malloc(sizeof(nflog_header_t));
+        (*nf)->header = (nfl_header_t *)malloc(sizeof(nfl_header_t));
         (*nf)->header->id = id;
         (*nf)->header->n_entries = 0;
         (*nf)->header->max_n_entries = entries_max;
@@ -234,10 +234,10 @@ void nfl_state_init(nflog_state_t **nf, uint32_t id, uint32_t entries_max,
     // consume physical memory before we fill the buffer.
     // Instead, fill entries with 0 on the fly, to squeeze
     // more space for compression.
-    (*nf)->store = (nflog_entry_t *)malloc(sizeof(nflog_entry_t) * entries_max);
+    (*nf)->store = (nfl_entry_t *)malloc(sizeof(nfl_entry_t) * entries_max);
 }
 
-static void nfl_state_free(nflog_state_t *nf) {
+static void nfl_state_free(nfl_state_t *nf) {
     // Free only packet store and leave the rest intact
     free((void *)nf->store);
 }

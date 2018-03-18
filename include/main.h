@@ -79,25 +79,26 @@
 #define CEIL_DIV(a, b) (((a) + (b)-1) / (b))
 #define NEXT(i, l) ((i + 1) % l)
 #define PREV(i, l) ((i - 1) % l)
-#define TRUNK_SIZE_BY_PAGE (150) // 150 pages
+// #define TRUNK_SIZE_BY_PAGE (150) // 150 pages
+#define TRUNK_SIZE_BY_PAGE (2) // 150 pages
 #define MAX_TRUNK_ID (80)
 #define STORAGE_PREFIX "nflog_storage"
 
-enum nflog_compression_t { COMPRESS_NONE, COMPRESS_LZ4, COMPRESS_ZSTD };
-typedef struct __attribute__((packed)) _nflog_header_t {
+enum nfl_compression_t { COMPRESS_NONE, COMPRESS_LZ4, COMPRESS_ZSTD };
+typedef struct __attribute__((packed)) _nfl_header_t {
     uint32_t                   id;                   /*     0     4 */
     uint32_t                   n_entries;            /*     4     4 */
     uint32_t                   max_n_entries;        /*     8     4 */
     uint32_t                   cksum;                /*    12     4 */
-    enum nflog_compression_t   compression_opt;      /*    16     4 */
+    enum nfl_compression_t   compression_opt;      /*    16     4 */
     time_t                     start_time;           /*    20     8 */
     time_t                     end_time;             /*    28     8 */
 
     /* size: 36, cachelines: 1, members: 7 */
     /* last cacheline: 36 bytes */
-} nflog_header_t;
+} nfl_header_t;
 
-typedef struct __attribute__((packed)) _nflog_entry_t {
+typedef struct __attribute__((packed)) _nfl_entry_t {
     // current timestamp since UNIX epoch
     time_t timestamp; /*     0     8 */
 
@@ -123,19 +124,19 @@ typedef struct __attribute__((packed)) _nflog_entry_t {
     uint16_t dport; /*    22     2 */
 
     /* size: 24, cachelines: 1, members: 8 */
-} nflog_entry_t;
+} nfl_entry_t;
 
-typedef struct _nflog_global_t {
+typedef struct _nfl_global_t {
     sem_t *nfl_commit_queue;
     uint16_t nfl_group_id;
     const char *storage_dir;
-    enum nflog_compression_t compression_opt;
-} nflog_global_t;
+    enum nfl_compression_t compression_opt;
+} nfl_global_t;
 
-typedef struct _nflog_state_t {
-    nflog_global_t *global;
-    nflog_header_t *header;
-    nflog_entry_t *store;
+typedef struct _nfl_state_t {
+    nfl_global_t *global;
+    nfl_header_t *header;
+    nfl_entry_t *store;
 
     struct nflog_handle *nfl_fd;
     struct nflog_g_handle *nfl_group_fd;
@@ -144,9 +145,9 @@ typedef struct _nflog_state_t {
     pthread_cond_t has_finished_cond;
     pthread_mutex_t has_finished_lock;
     pthread_t thread;
-} nflog_state_t;
+} nfl_state_t;
 
 // only copy size of ipv4 header + tcp header
-static const int nflog_recv_size = sizeof(struct iphdr) + sizeof(struct tcphdr);
+static const int nfl_recv_size = sizeof(struct iphdr) + sizeof(struct tcphdr);
 
 #endif // _MAIN_H

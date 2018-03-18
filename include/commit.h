@@ -3,8 +3,8 @@
 
 #include "common.h"
 void nfl_commit_init();
-void nfl_commit_worker(nflog_header_t *header, nflog_entry_t *store,
-                       enum nflog_compression_t compression_opt,
+void nfl_commit_worker(nfl_header_t *header, nfl_entry_t *store,
+                       enum nfl_compression_t compression_opt,
                        const char *filename);
 
 #endif

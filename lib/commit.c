@@ -3,25 +3,25 @@
 #include <string.h>
 #include <zstd.h>
 
-static void nfl_commit_default(FILE *f, nflog_entry_t *store,
+static void nfl_commit_default(FILE *f, nfl_entry_t *store,
                                uint32_t store_size);
-static void nfl_commit_lz4(FILE *f, nflog_entry_t *store, uint32_t store_size);
-static void nfl_commit_zstd(FILE *f, nflog_entry_t *store, uint32_t store_size);
+static void nfl_commit_lz4(FILE *f, nfl_entry_t *store, uint32_t store_size);
+static void nfl_commit_zstd(FILE *f, nfl_entry_t *store, uint32_t store_size);
 
 void nfl_commit_init() { /* TODO */ }
 
-static void nfl_commit_default(FILE *f, nflog_entry_t *store,
+static void nfl_commit_default(FILE *f, nfl_entry_t *store,
                                uint32_t store_size) {
     uint32_t written;
     written = fwrite(store, 1, store_size, f);
     ERR(written != store_size, strerror(errno));
 }
 
-static void nfl_commit_lz4(FILE *f, nflog_entry_t *store, uint32_t store_size) {
+static void nfl_commit_lz4(FILE *f, nfl_entry_t *store, uint32_t store_size) {
     /* TODO */
 }
 
-static void nfl_commit_zstd(FILE *f, nflog_entry_t *store,
+static void nfl_commit_zstd(FILE *f, nfl_entry_t *store,
                             uint32_t store_size) {
     size_t const bufsize = ZSTD_compressBound(store_size);
     void *buf;
@@ -35,8 +35,8 @@ static void nfl_commit_zstd(FILE *f, nflog_entry_t *store,
     free(buf);
 }
 
-void nfl_commit_worker(nflog_header_t *header, nflog_entry_t *store,
-                       enum nflog_compression_t compression_opt,
+void nfl_commit_worker(nfl_header_t *header, nfl_entry_t *store,
+                       enum nfl_compression_t compression_opt,
                        const char *filename) {
     FILE *f;
     uint32_t written;
@@ -45,11 +45,11 @@ void nfl_commit_worker(nflog_header_t *header, nflog_entry_t *store,
     ERR((f = fopen(filename, "wb")) == NULL, strerror(errno));
 
     // commit header
-    written = fwrite(header, 1, sizeof(nflog_header_t), f);
-    ERR(written != sizeof(nflog_header_t), strerror(errno));
+    written = fwrite(header, 1, sizeof(nfl_header_t), f);
+    ERR(written != sizeof(nfl_header_t), strerror(errno));
 
     // commit store
-    uint32_t store_size = sizeof(nflog_entry_t) * header->max_n_entries;
+    uint32_t store_size = sizeof(nfl_entry_t) * header->max_n_entries;
     switch(compression_opt) {
         case COMPRESS_NONE:
             debug("Comm worker #%u: commit without compression\n", header->id)

@@ -6,11 +6,11 @@
 #define ZSTD_STATIC_LINKING_ONLY // ZSTD_findDecompressedSize
 #include <zstd.h>
 
-static int nfl_extract_default(FILE *f, nflog_state_t *state);
-static int nfl_extract_zstd(FILE *f, nflog_state_t *state);
-static int nfl_extract_lz4(FILE *f, nflog_state_t *state);
+static int nfl_extract_default(FILE *f, nfl_state_t *state);
+static int nfl_extract_zstd(FILE *f, nfl_state_t *state);
+static int nfl_extract_lz4(FILE *f, nfl_state_t *state);
 
-static int nfl_verify_header(nflog_header_t *header) {
+static int nfl_verify_header(nfl_header_t *header) {
     if(header->cksum != nfl_header_cksum(header))
         return -1;
 
@@ -28,16 +28,16 @@ static int nfl_verify_header(nflog_header_t *header) {
     return 0;
 }
 
-static int nfl_extract_default(FILE *f, nflog_state_t *state) {
-    fread(state->store, state->header->n_entries, sizeof(nflog_entry_t), f);
+static int nfl_extract_default(FILE *f, nfl_state_t *state) {
+    fread(state->store, state->header->n_entries, sizeof(nfl_entry_t), f);
     WARN_RETURN(ferror(f), "%s", strerror(errno));
     return 0;
 }
 
-static int nfl_extract_zstd(FILE *f, nflog_state_t *state) {
+static int nfl_extract_zstd(FILE *f, nfl_state_t *state) {
     char *buf;
-    size_t const compressed_size = nfl_get_filesize(f) - sizeof(nflog_header_t),
-                 expected_decom_size = state->header->n_entries * sizeof(nflog_entry_t);
+    size_t const compressed_size = nfl_get_filesize(f) - sizeof(nfl_header_t),
+                 expected_decom_size = state->header->n_entries * sizeof(nfl_entry_t);
 
     ERR(!(buf = malloc(compressed_size)), "zstd: cannot malloc");
     fread(buf, compressed_size, 1, f);
@@ -60,23 +60,23 @@ static int nfl_extract_zstd(FILE *f, nflog_state_t *state) {
     return 0;
 }
 
-static int nfl_extract_lz4(FILE *f, nflog_state_t *state) {
+static int nfl_extract_lz4(FILE *f, nfl_state_t *state) {
     /* TODO */
     return 0;
 }
 
-int nfl_extract_worker(const char *filename, nflog_state_t *state) {
+int nfl_extract_worker(const char *filename, nfl_state_t *state) {
     FILE *f;
     int got = 0, ret = 0;
-    nflog_header_t *h;
+    nfl_header_t *h;
 
     debug("Extracting from file %s", filename);
     ERR((f = fopen(filename, "rb")) == NULL, "extract worker");
     /* ERR(nfl_check_file(f) < 0, "extract worker"); */
 
     // Read header
-    ERR(!(state->header = malloc(sizeof(nflog_header_t))), "extract malloc header");
-    got = fread(state->header, sizeof(nflog_header_t), 1, f);
+    ERR(!(state->header = malloc(sizeof(nfl_header_t))), "extract malloc header");
+    got = fread(state->header, sizeof(nfl_header_t), 1, f);
     h = state->header;
 
     // Check header validity
@@ -84,7 +84,7 @@ int nfl_extract_worker(const char *filename, nflog_state_t *state) {
     WARN_RETURN(!got || nfl_verify_header(h) < 0, "File %s has corrupted header.", filename);
 
     // Read body
-    ERR(!(state->store = malloc(sizeof(nflog_entry_t) * h->n_entries)), "extract malloc store");
+    ERR(!(state->store = malloc(sizeof(nfl_entry_t) * h->n_entries)), "extract malloc store");
     switch(h->compression_opt) {
         case COMPRESS_NONE:
             debug("Extract worker #%u: extract without compression\n", h->id)

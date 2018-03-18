@@ -71,7 +71,7 @@ uint32_t nfl_get_filesize(FILE *f) {
     return size;
 }
 
-uint32_t nfl_header_cksum(nflog_header_t *header) {
+uint32_t nfl_header_cksum(nfl_header_t *header) {
     #define H(s) (0x9e3779b9 + (s<< 6) + (s>> 1))
     register uint64_t s = 3784672181;
     s ^= H(header->id);
@@ -103,10 +103,10 @@ void nfl_cal_trunk(uint32_t total_size, uint32_t *trunk_cnt,
 void nfl_cal_entries(uint32_t trunk_size, uint32_t *entries_cnt) {
     assert(entries_cnt);
     *entries_cnt =
-        (trunk_size - sizeof(nflog_header_t)) / sizeof(nflog_entry_t);
+        (trunk_size - sizeof(nfl_header_t)) / sizeof(nfl_entry_t);
 }
 
-void nfl_format_output(char *output, nflog_entry_t *entry) {
+void nfl_format_output(char *output, nfl_entry_t *entry) {
     sprintf(output, "  "
                     "t=%ld\t"
                     "daddr=%s\t"
@@ -119,7 +119,7 @@ void nfl_format_output(char *output, nflog_entry_t *entry) {
             entry->sport, entry->dport);
 }
 
-int nfl_setup_compression(const char *flag, enum nflog_compression_t *opt) {
+int nfl_setup_compression(const char *flag, enum nfl_compression_t *opt) {
     if (flag == NULL) {
         *opt = COMPRESS_NONE;
     } else if (!strcmp(flag, "zstd") || !strcmp(flag, "zstandard")) {
