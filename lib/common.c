@@ -1,4 +1,5 @@
 #include "common.h"
+#include <arpa/inet.h>
 #include <assert.h>
 #include <errno.h>
 #include <limits.h>
@@ -106,15 +107,13 @@ void nfl_cal_entries(uint32_t trunk_size, uint32_t *entries_cnt) {
 }
 
 void nfl_format_output(char *output, nflog_entry_t *entry) {
-    char dest_ip[16];
-    snprintf(dest_ip, 16, "%pI4", &entry->daddr);
     sprintf(output, "t=%ld\t"
                     "daddr=%s\t"
                     "proto=%s\t"
                     "uid=%d\t"
                     "sport=%d\t"
                     "dport=%d",
-            entry->timestamp, dest_ip,
+            entry->timestamp, inet_ntoa(entry->daddr),
             entry->protocol == IPPROTO_TCP ? "TCP" : "UDP", entry->uid,
             entry->sport, entry->dport);
 }
