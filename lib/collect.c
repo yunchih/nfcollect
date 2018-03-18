@@ -160,6 +160,9 @@ void *nfl_collect_worker(void *targs) {
     nflog_unbind_group(nf->nfl_group_fd);
     nflog_close(nf->nfl_fd);
 
+    // write checksum
+    nf->header->cksum = nfl_header_cksum(nf->header);
+
     // spawn commit thread
     nfl_commit(nf);
     pthread_exit(NULL);

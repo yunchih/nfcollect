@@ -11,6 +11,9 @@ static int nfl_extract_zstd(FILE *f, nflog_state_t *state);
 static int nfl_extract_lz4(FILE *f, nflog_state_t *state);
 
 static int nfl_verify_header(nflog_header_t *header) {
+    if(header->cksum != nfl_header_cksum(header))
+        return -1;
+
     if (header->id > MAX_TRUNK_ID)
         return -1;
 
@@ -21,6 +24,7 @@ static int nfl_verify_header(nflog_header_t *header) {
     if ((time_t)header->start_time >= now || (time_t)header->end_time >= now ||
         header->start_time > header->end_time)
         return -1;
+
     return 0;
 }
 
