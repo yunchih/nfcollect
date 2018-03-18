@@ -3,14 +3,12 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#define ZSTD_STATIC_LINKING_ONLY // ZSTD_findDecompressedSize
+#include <zstd.h>
 
 static int nfl_extract_default(FILE *f, nflog_state_t *state);
 static int nfl_extract_zstd(FILE *f, nflog_state_t *state);
 static int nfl_extract_lz4(FILE *f, nflog_state_t *state);
-
-typedef int (*nflog_extract_run_table_t)(FILE *f, nflog_state_t *state);
-static const nflog_extract_run_table_t extract_run_table[] = {
-    nfl_extract_default, nfl_extract_lz4, nfl_extract_zstd};
 
 static int nfl_verify_header(nflog_header_t *header) {
     if (header->id > MAX_TRUNK_ID)
@@ -33,7 +31,28 @@ static int nfl_extract_default(FILE *f, nflog_state_t *state) {
 }
 
 static int nfl_extract_zstd(FILE *f, nflog_state_t *state) {
-    /* TODO */
+    char *buf;
+    size_t const compressed_size = nfl_get_filesize(f) - sizeof(nflog_header_t),
+                 estimate_decom_size = ZSTD_findDecompressedSize(state->store, compressed_size),
+                 expected_decom_size = state->header->n_entries * sizeof(nflog_entry_t);
+
+    if (estimate_decom_size == ZSTD_CONTENTSIZE_ERROR)
+        FATAL("zstd: file was not compressed by zstd.\n");
+    else if (estimate_decom_size == ZSTD_CONTENTSIZE_UNKNOWN)
+        FATAL("zstd: original size unknown. Use streaming decompression instead");
+
+    ERR(!(buf = malloc(compressed_size)), "zstd: cannot malloc");
+    fread(buf, compressed_size, 1, f);
+    WARN_RETURN(ferror(f), "%s", strerror(errno));
+
+    size_t const actual_decom_size =
+        ZSTD_decompress(state->store, expected_decom_size, buf, compressed_size);
+
+    if (actual_decom_size != expected_decom_size) {
+        FATAL("zstd: error decoding current file: %s \n", ZSTD_getErrorName(actual_decom_size));
+	}
+
+    free(buf);
     return 0;
 }
 
@@ -53,7 +72,7 @@ int nfl_extract_worker(const char *filename, nflog_state_t *state) {
     ERR(nfl_check_file(f) < 0, "extract worker");
 
     // Read header
-    ERR((*header = malloc(sizeof(nflog_header_t))), NULL);
+    ERR(!(*header = malloc(sizeof(nflog_header_t))), NULL);
     got = fread(*header, 1, sizeof(nflog_header_t), f);
 
     // Check header validity
@@ -62,11 +81,24 @@ int nfl_extract_worker(const char *filename, nflog_state_t *state) {
                 "File %s has corrupted header.", filename);
 
     // Read body
-    WARN_RETURN((*header)->compression_opt >
-                    sizeof(extract_run_table) / sizeof(extract_run_table[0]),
-                "Unknown compression in %s", filename);
     ERR((*store = malloc(sizeof(nflog_entry_t) * (*header)->n_entries)), NULL);
-    ret = extract_run_table[(*header)->compression_opt](f, state);
+    switch((*header)->compression_opt) {
+        case COMPRESS_NONE:
+            debug("Extract worker #%u: extract without compression\n", (*header)->id)
+            nfl_extract_default(f, state);
+            break;
+        case COMPRESS_LZ4:
+            debug("Extract worker #%u: extract with compression algorithm: lz4", (*header)->id)
+            nfl_extract_lz4(f, state);
+            break;
+        case COMPRESS_ZSTD:
+            debug("Extract worker #%u: extract with compression algorithm: zstd", (*header)->id)
+            nfl_extract_zstd(f, state);
+            break;
+        // Must not reach here ...
+        default: FATAL("Unknown compression option detected");
+    }
+
     fclose(f);
 
     return ret;
