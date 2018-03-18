@@ -73,7 +73,6 @@ static void extract_each(const char *storage_dir, const char *filename) {
     for (int entry = 0; entry < trunk.header->n_entries; ++entry) {
         nfl_format_output(output, trunk.store);
         puts((char *)output);
-        free((char *)output);
     }
 }
 
@@ -82,7 +81,7 @@ static void extract_all(const char *storage_dir) {
     struct dirent *ep;
     int i, index, max_index = -1;
     char *trunk_files[MAX_TRUNK_ID];
-    memset(trunk_files, MAX_TRUNK_ID, 0);
+    memset(trunk_files, sizeof(trunk_files), 0);
 
     ERR(!(dp = opendir(storage_dir)), "Can't open the storage directory");
     while ((ep = readdir(dp))) {

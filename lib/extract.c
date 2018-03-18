@@ -64,35 +64,34 @@ static int nfl_extract_lz4(FILE *f, nflog_state_t *state) {
 int nfl_extract_worker(const char *filename, nflog_state_t *state) {
     FILE *f;
     int got = 0, ret = 0;
-    nflog_header_t **header = &state->header;
-    nflog_entry_t **store = &state->store;
+    nflog_header_t *h;
 
     debug("Extracting from file %s", filename);
     ERR((f = fopen(filename, "rb")) == NULL, "extract worker");
-    ERR(nfl_check_file(f) < 0, "extract worker");
+    /* ERR(nfl_check_file(f) < 0, "extract worker"); */
 
     // Read header
-    ERR(!(*header = malloc(sizeof(nflog_header_t))), NULL);
-    got = fread(*header, 1, sizeof(nflog_header_t), f);
+    ERR(!(state->header = malloc(sizeof(nflog_header_t))), "extract malloc header");
+    got = fread(state->header, sizeof(nflog_header_t), 1, f);
+    h = state->header;
 
     // Check header validity
     WARN_RETURN(ferror(f), "%s", strerror(errno));
-    WARN_RETURN(got != sizeof(nflog_header_t) || nfl_verify_header(*header) < 0,
-                "File %s has corrupted header.", filename);
+    WARN_RETURN(!got || nfl_verify_header(h) < 0, "File %s has corrupted header.", filename);
 
     // Read body
-    ERR((*store = malloc(sizeof(nflog_entry_t) * (*header)->n_entries)), NULL);
-    switch((*header)->compression_opt) {
+    ERR(!(state->store = malloc(sizeof(nflog_entry_t) * h->n_entries)), "extract malloc store");
+    switch(h->compression_opt) {
         case COMPRESS_NONE:
-            debug("Extract worker #%u: extract without compression\n", (*header)->id)
+            debug("Extract worker #%u: extract without compression\n", h->id)
             nfl_extract_default(f, state);
             break;
         case COMPRESS_LZ4:
-            debug("Extract worker #%u: extract with compression algorithm: lz4", (*header)->id)
+            debug("Extract worker #%u: extract with compression algorithm: lz4", h->id)
             nfl_extract_lz4(f, state);
             break;
         case COMPRESS_ZSTD:
-            debug("Extract worker #%u: extract with compression algorithm: zstd", (*header)->id)
+            debug("Extract worker #%u: extract with compression algorithm: zstd", h->id)
             nfl_extract_zstd(f, state);
             break;
         // Must not reach here ...
