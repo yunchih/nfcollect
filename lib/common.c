@@ -34,17 +34,20 @@ int nfl_storage_match_index(const char *fn) {
     regmatch_t match[1];
     int ret;
 
+    if(unlikely(!strcmp(fn, ".") || !strcmp(fn, "..")))
+        return -1;
+
     if (!compiled) {
-        ERR(regcomp(&regex, "^" STORAGE_PREFIX "_[0-9]+", 0),
+        ERR(regcomp(&regex, "^" STORAGE_PREFIX "_([0-9]+)", REG_EXTENDED),
             "Could not compile regex");
         compiled = true;
     }
 
-    ret = regexec(&regex, fn, 1, match, 0);
+    ret = regexec(&regex, fn, 2, match, 0);
     if (!ret) {
-        assert(match[0].rm_so != (size_t)-1);
-        return strtol(fn + match[0].rm_so, NULL, 10);
-    } else if (ret != REG_NOMATCH) {
+        assert(match[1].rm_so != (size_t)-1);
+        return strtol(fn + match[1].rm_so, NULL, 10);
+    } else {
         char buf[100];
         regerror(ret, &regex, buf, sizeof(buf));
         WARN(1, "Regex match failed: %s", buf)
