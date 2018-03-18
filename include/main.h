@@ -53,18 +53,18 @@
 
 #define FATAL(format, ...)                                                     \
     do {                                                                       \
-        fprintf(stdout, "Error: " format "\n", ##__VA_ARGS__);                 \
+        fprintf(stdout, "[ERROR] " format "\n", ##__VA_ARGS__);                \
         exit(1);                                                               \
     } while(0)
 
 #define WARN(command, format, ...)                                             \
     if (command) {                                                             \
-        fprintf(stdout, format "\n", ##__VA_ARGS__);                           \
+        fprintf(stdout, "[WARN] " format "\n", ##__VA_ARGS__);                 \
     }
 
 #define WARN_RETURN(command, format, ...)                                      \
     if (command) {                                                             \
-        fprintf(stdout, format "\n", ##__VA_ARGS__);                           \
+        fprintf(stdout, "[WARN] " format "\n", ##__VA_ARGS__);                 \
         return -1;                                                             \
     }
 
