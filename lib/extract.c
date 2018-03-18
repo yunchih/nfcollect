@@ -33,17 +33,17 @@ static int nfl_extract_default(FILE *f, nflog_state_t *state) {
 static int nfl_extract_zstd(FILE *f, nflog_state_t *state) {
     char *buf;
     size_t const compressed_size = nfl_get_filesize(f) - sizeof(nflog_header_t),
-                 estimate_decom_size = ZSTD_findDecompressedSize(state->store, compressed_size),
                  expected_decom_size = state->header->n_entries * sizeof(nflog_entry_t);
-
-    if (estimate_decom_size == ZSTD_CONTENTSIZE_ERROR)
-        FATAL("zstd: file was not compressed by zstd.\n");
-    else if (estimate_decom_size == ZSTD_CONTENTSIZE_UNKNOWN)
-        FATAL("zstd: original size unknown. Use streaming decompression instead");
 
     ERR(!(buf = malloc(compressed_size)), "zstd: cannot malloc");
     fread(buf, compressed_size, 1, f);
     WARN_RETURN(ferror(f), "%s", strerror(errno));
+
+    size_t const estimate_decom_size = ZSTD_findDecompressedSize(buf, compressed_size);
+    if (estimate_decom_size == ZSTD_CONTENTSIZE_ERROR)
+        FATAL("zstd: file was not compressed by zstd.\n");
+    else if (estimate_decom_size == ZSTD_CONTENTSIZE_UNKNOWN)
+        FATAL("zstd: original size unknown. Use streaming decompression instead");
 
     size_t const actual_decom_size =
         ZSTD_decompress(state->store, expected_decom_size, buf, compressed_size);
