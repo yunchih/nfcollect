@@ -144,10 +144,12 @@ static void nfl_init(nfl_state_t *nf) {
     // bind to group
     nf->nfl_group_fd = nflog_bind_group(nf->nfl_fd, nf->global->nfl_group_id);
 
-    /* ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, sizeof(struct
-     * iphdr) + 4) < 0, */
     ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nfl_recv_size) < 0,
         "Could not set copy mode");
+
+    // Batch send 128 packets from kernel to userspace
+    ERR(nflog_set_qthresh(nf->nfl_group_fd, NF_NFLOG_QTHRESH),
+        "Could not set qthresh");
 
     nflog_callback_register(nf->nfl_group_fd, &handle_packet, nf);
     debug("Registering nflog callback");
@@ -167,10 +169,10 @@ void *nfl_collect_worker(void *targs) {
     time(&nf->header->start_time);
 
     int rv;
-    // Must have at least 128 to account for sizeof(struct iphdr) +
-    // sizeof(struct tcphdr)
-    // plus the size of meta data needed by the library's data structure
-    char buf[128];
+    // Must have at least 128 for each packet to account for
+    // sizeof(struct iphdr) + sizeof(struct tcphdr) plus the
+    // size of meta data needed by the library's data structure.
+    char buf[128 * NF_NFLOG_QTHRESH + 1];
     while (*p_cnt_now < cnt_max) {
         if ((rv = recv(fd, buf, sizeof(buf), 0)) && rv > 0) {
             debug("Recv worker #%u: nflog packet received (len=%u)",
