@@ -63,13 +63,14 @@ static void extract_each(const char *storage_dir, const char *filename) {
     sprintf(fullpath, "%s/%s", storage_dir, filename);
 
     debug("Extracting storage file: %s", fullpath);
-    if (nfl_extract_worker(fullpath, &trunk) < 0)
+    int entries = nfl_extract_worker(fullpath, &trunk);
+    if (entries < 0)
         return;
 
     free(fullpath);
 
     char output[1024];
-    for (int i = 0; i < trunk.header->n_entries; ++i) {
+    for (int i = 0; i < entries; ++i) {
         nfl_format_output(output, &trunk.store[i]);
         puts((char *)output);
     }

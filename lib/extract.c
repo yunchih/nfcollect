@@ -29,9 +29,10 @@ static int nfl_verify_header(nfl_header_t *header) {
 }
 
 static int nfl_extract_default(FILE *f, nfl_state_t *state) {
-    fread(state->store, state->header->n_entries, sizeof(nfl_entry_t), f);
+    int entries =
+        fread(state->store, sizeof(nfl_entry_t), state->header->n_entries, f);
     WARN_RETURN(ferror(f), "%s", strerror(errno));
-    return 0;
+    return entries;
 }
 
 static int nfl_extract_zstd(FILE *f, nfl_state_t *state) {
@@ -39,6 +40,9 @@ static int nfl_extract_zstd(FILE *f, nfl_state_t *state) {
     size_t const compressed_size = nfl_get_filesize(f) - sizeof(nfl_header_t),
                  expected_decom_size =
                      state->header->n_entries * sizeof(nfl_entry_t);
+
+    // It's possible that data or header is not written due to broken commit
+    WARN_RETURN(compressed_size <= 0, "%s", "zstd: no data in this trunk");
 
     ERR(!(buf = malloc(compressed_size)), "zstd: cannot malloc");
     fread(buf, compressed_size, 1, f);
@@ -61,7 +65,7 @@ static int nfl_extract_zstd(FILE *f, nfl_state_t *state) {
     }
 
     free(buf);
-    return 0;
+    return actual_decom_size / sizeof(nfl_entry_t);
 }
 
 static int nfl_extract_lz4(FILE *f, nfl_state_t *state) {
@@ -94,16 +98,18 @@ int nfl_extract_worker(const char *filename, nfl_state_t *state) {
         "extract malloc store");
     switch (h->compression_opt) {
     case COMPRESS_NONE:
-        debug("Extract worker #%u: extract without compression\n", h->id)
-            nfl_extract_default(f, state);
+        debug("Extract worker #%u: extract without compression\n", h->id);
+        ret = nfl_extract_default(f, state);
         break;
     case COMPRESS_LZ4:
         debug("Extract worker #%u: extract with compression algorithm: lz4",
-              h->id) nfl_extract_lz4(f, state);
+              h->id);
+        ret = nfl_extract_lz4(f, state);
         break;
     case COMPRESS_ZSTD:
         debug("Extract worker #%u: extract with compression algorithm: zstd",
-              h->id) nfl_extract_zstd(f, state);
+              h->id);
+        ret = nfl_extract_zstd(f, state);
         break;
     // Must not reach here ...
     default:

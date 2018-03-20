@@ -102,8 +102,7 @@ void nfl_cal_trunk(uint32_t total_size, uint32_t *trunk_cnt,
 
 void nfl_cal_entries(uint32_t trunk_size, uint32_t *entries_cnt) {
     assert(entries_cnt);
-    *entries_cnt =
-        (trunk_size - sizeof(nfl_header_t)) / sizeof(nfl_entry_t);
+    *entries_cnt = (trunk_size - sizeof(nfl_header_t)) / sizeof(nfl_entry_t);
 }
 
 void nfl_format_output(char *output, nfl_entry_t *entry) {
