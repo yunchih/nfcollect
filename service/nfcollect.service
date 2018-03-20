@@ -2,9 +2,13 @@
 Description=Netfilter nfcollect daemon
 Before=network-pre.target
 Wants=network-pre.target
+After=local-fs.target¶
+
 
 [Service]
-ExecStart=/usr/bin/nfcollect
+EnvironmentFile=-/etc/sysconfig/nfcollect
+EnvironmentFile=-/etc/default/nfcollect
+ExecStart=/usr/bin/nfcollect $NFCOLLECT_ARGS
 
 [Install]
 WantedBy=multi-user.target

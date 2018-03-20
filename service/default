@@ -1,0 +1,4 @@
+#
+# Arguments passed to nfcollect
+#
+NFCOLLECT_ARGS=
