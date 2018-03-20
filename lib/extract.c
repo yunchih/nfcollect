@@ -44,8 +44,8 @@ static int nfl_extract_zstd(FILE *f, nfl_state_t *state) {
     // It's possible that data or header is not written due to broken commit
     WARN_RETURN(compressed_size <= 0, "%s", "zstd: no data in this trunk");
 
-    ERR(!(buf = malloc(compressed_size)), "zstd: cannot malloc");
-    fread(buf, compressed_size, 1, f);
+    WARN_RETURN(!(buf = malloc(compressed_size)), "zstd: cannot malloc");
+    WARN_RETURN(!fread(buf, compressed_size, 1, f), "zstd: broken data section");
     WARN_RETURN(ferror(f), "%s", strerror(errno));
 
     size_t const estimate_decom_size =

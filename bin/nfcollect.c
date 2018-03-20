@@ -197,8 +197,8 @@ static uint32_t calculate_starting_trunk(const char *storage_dir) {
 
     ERR(!(dp = opendir(storage_dir)), "Can't open the storage directory");
 
-    getcwd(cwd, sizeof(cwd));
-    chdir(storage_dir);
+    ERR(!getcwd(cwd, sizeof(cwd)), "getcwd");
+    ERR(chdir(storage_dir) < 0, "chdir");
 
     while ((ep = readdir(dp))) {
         const char *fn = ep->d_name;
@@ -213,6 +213,6 @@ static uint32_t calculate_starting_trunk(const char *storage_dir) {
     }
 
     closedir(dp);
-    chdir(cwd);
+    ERR(chdir(cwd) < 0, "chdir");
     return newest_index;
 }
