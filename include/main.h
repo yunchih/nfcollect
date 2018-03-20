@@ -73,6 +73,8 @@
         fprintf(stdout, "[DEBUG] " format "\n", ##__VA_ARGS__);                \
     }
 
+#define info(format, ...) fprintf(stdout, "[INFO] " format "\n", ##__VA_ARGS__);
+
 #define likely(x) __builtin_expect((x), 1)
 #define unlikely(x) __builtin_expect((x), 0)
 
