@@ -6,7 +6,7 @@ pkgdesc='Collect NFLOG log entries and commit them to stable storage in binary (
 arch=(x86_64)
 url='https://github.com/yunchih/nfcollect'
 license=(MIT)
-makedepends=(automake make)
+makedepends=(automake autoconf make)
 depends=(libnetfilter_log zstd)
 source=(https://github.com/yunchih/${pkgname}/releases/download/v${pkgver}/${pkgname}-${pkgver}-${pkgrel}.tar.gz)
 sha1sums=('75b13cda95986cfc0c43155cdc1cd23236bad2f3')
@@ -24,5 +24,6 @@ check() {
 package() {
   cd $pkgname-$pkgver
   make DESTDIR="$pkgdir" install
-  install -Dm644 "service/${pkgname}.service" "$pkgdir"/usr/lib/systemd/system/${pkgname}.service
+  install -Dm644 "service/${pkgname}.service" "${pkgdir}/usr/lib/systemd/system/${pkgname}.service"
+  install -Dm644 "service/default" "${pkgdir}/etc/default/${pkgname}"
 }

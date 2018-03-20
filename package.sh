@@ -17,6 +17,7 @@ cp -a bin lib include \
       "${PKGDIR}"
 
 tar --exclude "*.swp" \
+    --exclude "*.o" \
     --exclude .deps \
     --exclude .dirstamp \
     -zcvf "$PKG" "${PKGDIR}"
