@@ -50,9 +50,8 @@ const char *help_text =
     "\n";
 
 void sig_handler(int signo) {
-    if (signo == SIGHUP) {
-        /* TODO */
-    }
+    if (signo == SIGHUP)
+        puts("Terminated due to SIGHUP ...");
 }
 
 int main(int argc, char *argv[]) {

@@ -50,10 +50,9 @@ const char *help_text =
     "  -v --version                 print version information\n"
     "\n";
 
-static void sig_handler(int signo) {
-    if (signo == SIGHUP) {
-        /* TODO */
-    }
+void sig_handler(int signo) {
+    if (signo == SIGHUP)
+        puts("Terminated due to SIGHUP ...");
 }
 
 static void extract_each(const char *storage_dir, const char *filename) {
