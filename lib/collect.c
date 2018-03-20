@@ -162,9 +162,6 @@ void *nfl_collect_worker(void *targs) {
     nfl_init(nf);
 
     int fd = nflog_fd(nf->nfl_fd);
-    uint32_t *p_cnt_now = &(nf->header->n_entries);
-    uint32_t cnt_max = nf->header->max_n_entries;
-
     debug("Recv worker #%u: main loop starts", nf->header->id);
     time(&nf->header->start_time);
 
@@ -173,16 +170,17 @@ void *nfl_collect_worker(void *targs) {
     // sizeof(struct iphdr) + sizeof(struct tcphdr) plus the
     // size of meta data needed by the library's data structure.
     char buf[128 * NF_NFLOG_QTHRESH + 1];
-    while (*p_cnt_now < cnt_max) {
+    while (nf->header->n_entries < nf->header->max_n_entries) {
         if ((rv = recv(fd, buf, sizeof(buf), 0)) && rv > 0) {
-            debug("Recv worker #%u: nflog packet received (len=%u)",
-                  nf->header->id, rv);
+            debug("Recv worker #%u: nflog packet received "
+                  "(len=%u, #entries=%u)",
+                  nf->header->id, rv, nf->header->n_entries);
             nflog_handle_packet(nf->nfl_fd, buf, rv);
         }
     }
 
     debug("Recv worker #%u: finish recv, received packets: %u", nf->header->id,
-          cnt_max);
+          nf->header->max_n_entries);
 
     // write end time
     time(&nf->header->end_time);
