@@ -35,7 +35,7 @@ int nfl_storage_match_index(const char *fn) {
     regmatch_t match[1];
     int ret;
 
-    if(unlikely(!strcmp(fn, ".") || !strcmp(fn, "..")))
+    if (unlikely(!strcmp(fn, ".") || !strcmp(fn, "..")))
         return -1;
 
     if (!compiled) {
@@ -72,7 +72,7 @@ uint32_t nfl_get_filesize(FILE *f) {
 }
 
 uint32_t nfl_header_cksum(nfl_header_t *header) {
-    #define H(s) (0x9e3779b9 + (s<< 6) + (s>> 1))
+#define H(s) (0x9e3779b9 + (s << 6) + (s >> 1))
     register uint64_t s = 3784672181;
     s ^= H(header->id);
     s ^= H(header->max_n_entries);

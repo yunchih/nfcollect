@@ -120,8 +120,7 @@ static void nfl_init(nfl_state_t *nf) {
 
     /* ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, sizeof(struct
      * iphdr) + 4) < 0, */
-    ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nfl_recv_size) <
-            0,
+    ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nfl_recv_size) < 0,
         "Could not set copy mode");
 
     nflog_callback_register(nf->nfl_group_fd, &handle_packet, nf);
@@ -222,7 +221,8 @@ void nfl_state_init(nfl_state_t **nf, uint32_t id, uint32_t entries_max,
     }
 
     // Ensure trunk with same id in previous run has finished to prevent reusing
-    // a trunk which it's still being used.  Furthermore, this hopefully alleviate us
+    // a trunk which it's still being used.  Furthermore, this hopefully
+    // alleviate us
     // from bursty network traffic.
     pthread_mutex_lock(&(*nf)->has_finished_lock);
     while (!(*nf)->has_finished)
