@@ -139,7 +139,10 @@ void *nfl_collect_worker(void *targs) {
     time(&nf->header->start_time);
 
     int rv;
-    char buf[4096];
+    // Must have at least 128 to account for sizeof(struct iphdr) +
+    // sizeof(struct tcphdr)
+    // plus the size of meta data needed by the library's data structure
+    char buf[128];
     while (*p_cnt_now < cnt_max) {
         if ((rv = recv(fd, buf, sizeof(buf), 0)) && rv > 0) {
             debug("Recv worker #%u: nflog packet received (len=%u)",
