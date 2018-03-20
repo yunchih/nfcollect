@@ -51,8 +51,6 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
     int payload_len = nflog_get_payload(nfa, &payload);
     nfl_state_t *nf = (nfl_state_t *)_nf;
 
-    pthread_testcancel(); /* cancellation point */
-
     // only process ipv4 packet
     if (unlikely(payload_len < 0) || ((payload[0] & 0xf0) != 0x40))
         return 1;
@@ -143,7 +141,6 @@ void *nfl_collect_worker(void *targs) {
     int rv;
     char buf[4096];
     while (*p_cnt_now < cnt_max) {
-        pthread_testcancel(); /* cancellation point */
         if ((rv = recv(fd, buf, sizeof(buf), 0)) && rv > 0) {
             debug("Recv worker #%u: nflog packet received (len=%u)",
                   nf->header->id, rv);
