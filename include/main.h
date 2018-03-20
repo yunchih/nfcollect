@@ -55,7 +55,7 @@
     do {                                                                       \
         fprintf(stdout, "[ERROR] " format "\n", ##__VA_ARGS__);                \
         exit(1);                                                               \
-    } while(0)
+    } while (0)
 
 #define WARN(command, format, ...)                                             \
     if (command) {                                                             \
@@ -85,13 +85,13 @@
 
 enum nfl_compression_t { COMPRESS_NONE, COMPRESS_LZ4, COMPRESS_ZSTD };
 typedef struct __attribute__((packed)) _nfl_header_t {
-    uint32_t                   id;                   /*     0     4 */
-    uint32_t                   n_entries;            /*     4     4 */
-    uint32_t                   max_n_entries;        /*     8     4 */
-    uint32_t                   cksum;                /*    12     4 */
-    enum nfl_compression_t     compression_opt;      /*    16     4 */
-    time_t                     start_time;           /*    20     8 */
-    time_t                     end_time;             /*    28     8 */
+    uint32_t id;                            /*     0     4 */
+    uint32_t n_entries;                     /*     4     4 */
+    uint32_t max_n_entries;                 /*     8     4 */
+    uint32_t cksum;                         /*    12     4 */
+    enum nfl_compression_t compression_opt; /*    16     4 */
+    time_t start_time;                      /*    20     8 */
+    time_t end_time;                        /*    28     8 */
 
     /* size: 36, cachelines: 1, members: 7 */
     /* last cacheline: 36 bytes */
