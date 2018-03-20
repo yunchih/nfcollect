@@ -1,0 +1,10 @@
+[Unit]
+Description=Netfilter nfcollect daemon
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+ExecStart=/usr/bin/nfcollect
+
+[Install]
+WantedBy=multi-user.target
