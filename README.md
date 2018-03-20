@@ -14,6 +14,19 @@ specific directory, which will be scanned by `nfextract` to extract all trunks.
 
 Due to communication with the kernel, **this program requires root privilege**.
 
+## Dependencies Installation
+
+#### Fedora
+
+```
+sudo dnf install libnetfilter_log libzstd-devel
+```
+
+#### Ubuntu
+
+```bash
+sudo apt install libnetfilter-log1 libnetfilter-log-dev libzstd1 libzstd1-dev
+```
 
 ## Build
 
@@ -38,6 +51,7 @@ Options:
   -g --nflog-group=<id>        the group id to collect
   -p --parallelism=<num>       max number of committer thread
   -s --storage_size=<dirsize>  log files maximum total size in MiB
+  -t --truncate                whether or not to truncate existing trunks (default: no)
   -v --version                 print version information
 
 $ ./nfextract -h     
