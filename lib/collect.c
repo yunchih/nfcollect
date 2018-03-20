@@ -31,6 +31,11 @@
 #include <sys/types.h> // u_int32_t for libnetfilter_log
 #include <time.h>
 
+// Number of packet to queue inside kernel before sending to userspsace.
+// Setting this value to, e.g. 64 accumulates ten packets inside the
+// kernel and transmits them as one netlink multipart message to userspace.
+#define NF_NFLOG_QTHRESH 64
+
 nfl_global_t g;
 
 static void nfl_init(nfl_state_t *nf);
@@ -40,6 +45,7 @@ static void nfl_state_free(nfl_state_t *nf);
 
 static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
                          struct nflog_data *nfa, void *_nf) {
+#define HASH_ENTRY(e) (e->sport ^ e->timestamp)
     register const struct iphdr *iph;
     register nfl_entry_t *entry;
     const struct tcphdr *tcph;
@@ -48,12 +54,18 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
     void *inner_hdr;
     uint32_t uid;
 
+    // Store previous data hash (see HASH_ENTRY above) for rate-limiting purpose
+    static uint64_t prev_entry_hash;
+
     int payload_len = nflog_get_payload(nfa, &payload);
     nfl_state_t *nf = (nfl_state_t *)_nf;
 
     // only process ipv4 packet
-    if (unlikely(payload_len < 0) || ((payload[0] & 0xf0) != 0x40))
+    if (unlikely(payload_len < 0) || ((payload[0] & 0xf0) != 0x40)) {
+        debug("Ignore non-IPv4 packet");
         return 1;
+    }
+
     if (unlikely(nf->header->n_entries >= nf->header->max_n_entries))
         return 1;
 
@@ -74,8 +86,25 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
         udph = (struct udphdr *)inner_hdr;
         entry->sport = ntohs(udph->source);
         entry->dport = ntohs(udph->dest);
-    } else
+    } else {
+        debug("Ignore non-TCP/UDP packet");
         return 1; // Ignore other types of packet
+    }
+
+    // get current timestamp
+    time(&entry->timestamp);
+
+    // Rate-limit incoming packets:
+    // Ignore those with identical hash to prevent
+    // packet flooding.  This simple trick is based
+    // on the observation that packet surge usually
+    // originates from one process.  Even if different
+    // processes send simultaneously, the kernel deliver
+    // packets in batch instead in interleaving manner.
+    uint64_t entry_hash = HASH_ENTRY(entry);
+    if (entry_hash == prev_entry_hash)
+        return 1;
+    prev_entry_hash = entry_hash;
 
     entry->daddr.s_addr = iph->daddr;
     entry->protocol = iph->protocol;
@@ -85,8 +114,7 @@ static int handle_packet(struct nflog_g_handle *gh, struct nfgenmsg *nfmsg,
         return 1;
     entry->uid = uid;
 
-    // get current timestamp
-    time(&entry->timestamp);
+    // Advance to next entry
     nf->header->n_entries++;
 
     debug("Recv packet info entry #%d: "
