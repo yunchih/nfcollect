@@ -161,7 +161,8 @@ int main(int argc, char *argv[]) {
         info(PACKAGE ": requested to truncate (overwrite) trunks in %s",
              storage_dir);
     } else {
-        cur_trunk = NEXT(calculate_starting_trunk(storage_dir), trunk_cnt);
+        int calculated_trunk = calculate_starting_trunk(storage_dir);
+        cur_trunk = calculated_trunk < 0 ? 0: NEXT(calculated_trunk, trunk_cnt);
         const char *fn = nfl_get_filename(storage_dir, cur_trunk);
         info(PACKAGE ": will start writing to trunk %s and onward", fn);
         free((char *)fn);
@@ -185,13 +186,14 @@ int main(int argc, char *argv[]) {
 /*
  * Need to find a trunk to start with after a restart
  * We choose the one with newest modification time.
+ * If no existing trunk is found, returns -1
  */
 static uint32_t calculate_starting_trunk(const char *storage_dir) {
     DIR *dp;
     struct stat stat;
     struct dirent *ep;
     time_t newest = (time_t)0;
-    uint32_t newest_index = 0;
+    uint32_t newest_index = -1;
     int index;
     char cwd[100];
 

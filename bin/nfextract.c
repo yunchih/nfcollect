@@ -81,7 +81,7 @@ static void extract_all(const char *storage_dir) {
     struct dirent *ep;
     int i, index, max_index = -1;
     char *trunk_files[MAX_TRUNK_ID];
-    memset(trunk_files, sizeof(trunk_files), 0);
+    memset(trunk_files, 0, sizeof(trunk_files));
 
     ERR(!(dp = opendir(storage_dir)), "Can't open the storage directory");
     while ((ep = readdir(dp))) {

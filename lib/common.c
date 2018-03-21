@@ -32,7 +32,7 @@ int nfl_check_dir(const char *storage_dir) {
 int nfl_storage_match_index(const char *fn) {
     static regex_t regex;
     static bool compiled = false;
-    regmatch_t match[1];
+    regmatch_t match[2];
     int ret;
 
     if (unlikely(!strcmp(fn, ".") || !strcmp(fn, "..")))
