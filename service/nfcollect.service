@@ -2,7 +2,7 @@
 Description=Netfilter nfcollect daemon
 Before=network-pre.target
 Wants=network-pre.target
-After=local-fs.target¶
+After=local-fs.target
 
 
 [Service]
