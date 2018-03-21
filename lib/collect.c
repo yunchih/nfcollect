@@ -143,6 +143,12 @@ static void nfl_init(nfl_state_t *nf) {
 
     // bind to group
     nf->nfl_group_fd = nflog_bind_group(nf->nfl_fd, nf->global->nfl_group_id);
+    // If the returned group_fd is NULL, it's likely
+    // that another process (like ulogd) has already
+    // bound to the same NFLOD group.
+    if(!nf->nfl_group_fd)
+        FATAL("Cannot bind to NFLOG group %d, is it used by another process?",
+              nf->global->nfl_group_id);
 
     ERR(nflog_set_mode(nf->nfl_group_fd, NFULNL_COPY_PACKET, nfl_recv_size) < 0,
         "Could not set copy mode");
