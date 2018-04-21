@@ -12,7 +12,13 @@ A full *trunk* will be committed to disk by configurable means (currently `zstd`
 compression and no compression is implemented).  Trunks will be stored in a
 specific directory, which will be scanned by `nfextract` to extract all trunks.
 
-Due to communication with the kernel, **this program requires root privilege**.
+* Due to communication with the kernel, **this program requires root privilege**.
+* The maximum size of raw collection is configured by `storage_size`.  When we
+  received that many packets, further packets will overwrite starting from the
+  begining, mimicing a rotation-based storage.  Unfortunately, if compression is
+  enabled, the reduced size will not be reflected because currently we calculate
+  size only in term of raw size.  Thus, user has to manually scale `storage_size` by
+  compression ratio of their workload.
 
 ## Dependencies Installation
 
