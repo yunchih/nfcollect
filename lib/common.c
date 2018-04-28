@@ -77,6 +77,8 @@ uint32_t nfl_header_cksum(nfl_header_t *header) {
     s ^= H(header->id);
     s ^= H(header->max_n_entries);
     s ^= H(header->n_entries);
+    s ^= H(header->raw_size);
+    s ^= H(header->compression_opt);
     s ^= H(header->start_time);
     s ^= H(header->end_time);
     return s & UINT_MAX;

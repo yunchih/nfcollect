@@ -82,21 +82,23 @@
 #define NEXT(i, l) ((i + 1) % l)
 #define PREV(i, l) ((i - 1) % l)
 #define TRUNK_SIZE_BY_PAGE (150) // 150 pages
+#define MAX_SEGMENT_PER_TRUNK (1024)
 #define MAX_TRUNK_ID (80)
 #define STORAGE_PREFIX "nflog_storage"
 
 enum nfl_compression_t { COMPRESS_NONE, COMPRESS_LZ4, COMPRESS_ZSTD };
 typedef struct __attribute__((packed)) _nfl_header_t {
-    uint32_t id;                            /*     0     4 */
-    uint32_t n_entries;                     /*     4     4 */
-    uint32_t max_n_entries;                 /*     8     4 */
-    uint32_t cksum;                         /*    12     4 */
-    enum nfl_compression_t compression_opt; /*    16     4 */
-    time_t start_time;                      /*    20     8 */
-    time_t end_time;                        /*    28     8 */
+    uint32_t               id;                   /*     0     4 */
+    uint32_t               n_entries;            /*     4     4 */
+    uint32_t               max_n_entries;        /*     8     4 */
+    uint32_t               cksum;                /*    12     4 */
+    uint32_t               raw_size;             /*    16     4 */
+    enum nfl_compression_t compression_opt;      /*    20     4 */
+    time_t                 start_time;           /*    24     8 */
+    time_t                 end_time;             /*    32     8 */
 
-    /* size: 36, cachelines: 1, members: 7 */
-    /* last cacheline: 36 bytes */
+    /* size: 40, cachelines: 1, members: 8 */
+    /* last cacheline: 40 bytes */
 } nfl_header_t;
 
 typedef struct __attribute__((packed)) _nfl_entry_t {

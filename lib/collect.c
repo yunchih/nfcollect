@@ -218,6 +218,7 @@ static void *nfl_start_commit_worker(void *targs) {
     nfl_state_t *nf = (nfl_state_t *)targs;
     const char *filename = nfl_get_filename(g.storage_dir, nf->header->id);
     debug("Comm worker #%u: thread started.", nf->header->id);
+    /* FIXME */
     bool truncate = true;
 
     sem_wait(g.nfl_commit_queue);
