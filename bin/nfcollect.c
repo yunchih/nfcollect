@@ -54,10 +54,13 @@ const char *help_text =
     "\n";
 
 static uint32_t calculate_starting_trunk(const char *storage_dir);
+static nfl_nl_t netlink_fd;
 
 static void sig_handler(int signo) {
-    if (signo == SIGHUP)
+    if (signo == SIGHUP) {
         puts("Terminated due to SIGHUP ...");
+        nfl_close_netlink_fd(&netlink_fd);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -133,7 +136,6 @@ int main(int argc, char *argv[]) {
         max_commit_worker = max_commit_worker > 0 ? max_commit_worker : 1;
     }
 
-    g.nfl_group_id = nfl_group_id;
     g.storage_dir = storage_dir;
 
     // register signal handler
@@ -149,7 +151,6 @@ int main(int argc, char *argv[]) {
 
     // Set up nflog receiver worker
     nfl_state_t **trunks = (nfl_state_t **)calloc(trunk_cnt, sizeof(void *));
-    nfl_commit_init(trunk_cnt);
 
     info(PACKAGE ": storing in directory '%s', capped by %d MiB", storage_dir,
          storage_size);
@@ -168,9 +169,12 @@ int main(int argc, char *argv[]) {
         free((char *)fn);
     }
 
+    nfl_open_netlink_fd(&netlink_fd, nfl_group_id);
     for (;; cur_trunk = NEXT(cur_trunk, trunk_cnt)) {
         debug("Running receiver worker: id = %d", cur_trunk);
         nfl_state_init(&(trunks[cur_trunk]), cur_trunk, entries_max, &g);
+        trunks[cur_trunk]->netlink_fd = &netlink_fd;
+
         pthread_create(&(trunks[cur_trunk]->thread), NULL, nfl_collect_worker,
                        (void *)trunks[cur_trunk]);
         // wait for current receiver worker
@@ -179,7 +183,8 @@ int main(int argc, char *argv[]) {
 
     // Won't reach here
     // We don't actually free trunks or the semaphore at all
-    // sem_destroy(&nfl_commit_queue);
+    sem_destroy(g.nfl_commit_queue);
+    nfl_close_netlink_fd(&netlink_fd);
     exit(0);
 }
 

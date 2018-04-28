@@ -134,17 +134,21 @@ typedef struct _nfl_global_t {
     enum nfl_compression_t compression_opt;
 } nfl_global_t;
 
+typedef struct _nfl_nl_t {
+    struct nflog_handle *fd;
+    struct nflog_g_handle *group_fd;
+} nfl_nl_t;
+
 typedef struct _nfl_state_t {
     nfl_global_t *global;
     nfl_header_t *header;
     nfl_entry_t *store;
+    nfl_nl_t *netlink_fd;
 
-    struct nflog_handle *nfl_fd;
-    struct nflog_g_handle *nfl_group_fd;
+    bool has_finished_recv;
+    pthread_cond_t has_finished_recv_cond;
+    pthread_mutex_t has_finished_recv_lock;
 
-    bool has_finished;
-    pthread_cond_t has_finished_cond;
-    pthread_mutex_t has_finished_lock;
     pthread_t thread;
 } nfl_state_t;
 
