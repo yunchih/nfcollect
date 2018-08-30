@@ -72,16 +72,8 @@ uint32_t nfl_get_filesize(FILE *f) {
 }
 
 uint32_t nfl_header_cksum(nfl_header_t *header) {
-#define H(s) (0x9e3779b9 + (s << 6) + (s >> 1))
-    register uint64_t s = 3784672181;
-    s ^= H(header->id);
-    s ^= H(header->max_n_entries);
-    s ^= H(header->n_entries);
-    s ^= H(header->raw_size);
-    s ^= H(header->compression_opt);
-    s ^= H(header->start_time);
-    s ^= H(header->end_time);
-    return s & UINT_MAX;
+    /* simply use a magic number for integrity check */
+    return 0x9e37a9b9;
 }
 
 void nfl_cal_trunk(uint32_t total_size, uint32_t *trunk_cnt,

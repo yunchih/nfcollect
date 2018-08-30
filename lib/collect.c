@@ -197,6 +197,9 @@ void *nfl_collect_worker(void *targs) {
 
     // write checksum
     nf->header->cksum = nfl_header_cksum(nf->header);
+    debug("Recv worker #%u: calculated checksum: %x",
+          nf->header->id,
+          nf->header->cksum);
 
     // spawn commit thread
     nfl_commit(nf);

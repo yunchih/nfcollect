@@ -92,6 +92,7 @@ static void extract_all(const char *storage_dir) {
                 WARN(1, "Storage trunk file index "
                         "out of predefined range: %s",
                      ep->d_name);
+                return;
             } else {
                 trunk_files[index] = strdup(ep->d_name);
                 if (index > max_index)
@@ -102,7 +103,7 @@ static void extract_all(const char *storage_dir) {
 
     closedir(dp);
 
-    for (i = 0; i < max_index; ++i) {
+    for (i = 0; i <= max_index; ++i) {
         if (trunk_files[i])
             extract_each(storage_dir, trunk_files[i]);
         free(trunk_files[i]);

@@ -11,8 +11,11 @@ static int nfl_extract_zstd(FILE *f, nfl_state_t *state);
 static int nfl_extract_lz4(FILE *f, nfl_state_t *state);
 
 static int nfl_verify_header(nfl_header_t *header) {
-    if (header->cksum != nfl_header_cksum(header))
+    if (header->cksum != nfl_header_cksum(header)) {
+        debug("Header checksum mismatch: expected: 0x%x, got: 0x%x",
+                header->cksum, nfl_header_cksum(header));
         return -1;
+    }
 
     if (header->id > MAX_TRUNK_ID)
         return -1;
@@ -90,7 +93,7 @@ int nfl_extract_worker(const char *filename, nfl_state_t *state) {
 
     // Check header validity
     WARN_RETURN(ferror(f), "%s", strerror(errno));
-    WARN_RETURN(!got || nfl_verify_header(h) < 0,
+    WARN_RETURN(got == 0 || nfl_verify_header(h) < 0,
                 "File %s has corrupted header.", filename);
 
     // Read body
