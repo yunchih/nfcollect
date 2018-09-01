@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <string.h>
 #include <unistd.h>
 
 const char *help_text =
@@ -103,7 +104,7 @@ int main(int argc, char *argv[]) {
             compression_flag = optarg;
             break;
         case 'd':
-            storage_dir = optarg;
+            storage_dir = strdup(optarg);
             break;
         case 'g':
             nfl_group_id = atoi(optarg);

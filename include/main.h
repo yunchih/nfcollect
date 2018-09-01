@@ -26,12 +26,16 @@
 #include <assert.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include <netinet/tcp.h>
+#include <linux/tcp.h>
 #include <netinet/udp.h>
 #include <semaphore.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+
+#include <pthread.h>
+#include <sys/types.h>
 
 #ifdef DEBUG
 #define DEBUG_ON 1
@@ -153,6 +157,10 @@ typedef struct _nfl_state_t {
 
     pthread_t thread;
 } nfl_state_t;
+
+typedef struct _time_range_t {
+    time_t from, until;
+} time_range_t;
 
 // only copy size of ipv4 header + tcp header
 static const int nfl_recv_size = sizeof(struct iphdr) + sizeof(struct tcphdr);

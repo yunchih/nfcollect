@@ -76,7 +76,7 @@ static int nfl_extract_lz4(FILE *f, nfl_state_t *state) {
     return 0;
 }
 
-int nfl_extract_worker(const char *filename, nfl_state_t *state) {
+int nfl_extract_worker(const char *filename, nfl_state_t *state, const time_range_t *range) {
     FILE *f;
     int got = 0, ret = 0;
     nfl_header_t *h;
@@ -90,6 +90,9 @@ int nfl_extract_worker(const char *filename, nfl_state_t *state) {
         "extract malloc header");
     got = fread(state->header, sizeof(nfl_header_t), 1, f);
     h = state->header;
+
+    if(h->end_time < range->from || h->start_time > range->until)
+        return 0;
 
     // Check header validity
     WARN_RETURN(ferror(f), "%s", strerror(errno));

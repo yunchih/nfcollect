@@ -78,7 +78,7 @@ uint32_t nfl_header_cksum(nfl_header_t *header) {
 
 void nfl_cal_trunk(uint32_t total_size, uint32_t *trunk_cnt,
                    uint32_t *trunk_size) {
-    uint32_t pgsize = getpagesize();
+    uint32_t pgsize = sysconf(_SC_PAGE_SIZE);
     total_size *= 1024 * 1024; // MiB
 
     assert(trunk_cnt);

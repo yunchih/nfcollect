@@ -34,9 +34,15 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #define PROG "nfextract"
+#define DATE_FORMAT_HUMAN "YYYY-MM-DD [HH:MM][:SS]"
+#define DATE_FORMAT "%Y-%m-%d"
+#define DATE_FORMAT_FULL DATE_FORMAT " %H:%M"
+#define DATE_FORMAT_FULL2 DATE_FORMAT " %H:%M:%S"
 
 sem_t nfl_commit_queue;
 uint16_t nfl_group_id;
@@ -45,9 +51,11 @@ const char *help_text =
     "Usage: " PROG " [OPTION]\n"
     "\n"
     "Options:\n"
-    "  -d --storage_dir=<dirname>   log files storage directory\n"
-    "  -h --help                    print this help\n"
-    "  -v --version                 print version information\n"
+    "  -d --storage_dir=<dirname> log files storage directory\n"
+    "  -h --help                  print this help\n"
+    "  -v --version               print version information\n"
+    "  -s --since                 start showing entries on or newer than the specified date (format: " DATE_FORMAT_HUMAN ")\n"
+    "  -u --until                 stop showing entries on or older than the specified date (format: " DATE_FORMAT_HUMAN ")\n"
     "\n";
 
 void sig_handler(int signo) {
@@ -55,7 +63,7 @@ void sig_handler(int signo) {
         puts("Terminated due to SIGHUP ...");
 }
 
-static void extract_each(const char *storage_dir, const char *filename) {
+static void extract_each(const char *storage_dir, const char *filename, const time_range_t *range) {
     nfl_state_t trunk;
 
     // Build full path
@@ -63,20 +71,22 @@ static void extract_each(const char *storage_dir, const char *filename) {
     sprintf(fullpath, "%s/%s", storage_dir, filename);
 
     debug("Extracting storage file: %s", fullpath);
-    int entries = nfl_extract_worker(fullpath, &trunk);
-    if (entries < 0)
-        return;
-
+    int entries = nfl_extract_worker(fullpath, &trunk, range);
     free(fullpath);
 
+    int i = 0;
+    while(i < entries && trunk.store[i].timestamp < range->from)
+        i++;
+
     char output[1024];
-    for (int i = 0; i < entries; ++i) {
+    while(i < entries && trunk.store[i].timestamp < range->until) {
         nfl_format_output(output, &trunk.store[i]);
         puts((char *)output);
+        ++i;
     }
 }
 
-static void extract_all(const char *storage_dir) {
+static void extract_all(const char *storage_dir, const time_range_t *range) {
     DIR *dp;
     struct dirent *ep;
     int i, index, max_index = -1;
@@ -105,15 +115,41 @@ static void extract_all(const char *storage_dir) {
 
     for (i = 0; i <= max_index; ++i) {
         if (trunk_files[i])
-            extract_each(storage_dir, trunk_files[i]);
+            extract_each(storage_dir, trunk_files[i], range);
         free(trunk_files[i]);
     }
 }
 
+static time_t parse_date_string(time_t default_t, const char *date) {
+    struct tm parsed;
+    char *ret;
+    if(!date) return default_t;
+
+#define PARSE(FORMAT) \
+        ret = strptime(date, FORMAT, &parsed); \
+        if(ret && !*ret) return mktime(&parsed); \
+
+    PARSE(DATE_FORMAT);
+    PARSE(DATE_FORMAT_FULL);
+    PARSE(DATE_FORMAT_FULL2);
+
+    FATAL("Wrong date format: expected: \"" DATE_FORMAT_HUMAN "\", got: \"%s\"", date);
+    return -1;
+}
+static void populate_date_range(time_range_t *range, const char *since, const char *until) {
+    range->from  = parse_date_string(0, since);
+    range->until = parse_date_string(time(NULL), until);
+}
+
 int main(int argc, char *argv[]) {
     char *storage_dir = NULL;
+    char *date_since_str = NULL, *date_until_str = NULL;
+    time_range_t date_range;
+
     struct option longopts[] = {/* name, has_args, flag, val */
                                 {"storage_dir", required_argument, NULL, 'd'},
+                                {"since", optional_argument, NULL, 's'},
+                                {"until", optional_argument, NULL, 'u'},
                                 {"help", no_argument, NULL, 'h'},
                                 {"version", no_argument, NULL, 'v'},
                                 {0, 0, 0, 0}};
@@ -130,7 +166,16 @@ int main(int argc, char *argv[]) {
             exit(0);
             break;
         case 'd':
-            storage_dir = optarg;
+            if(!optarg) FATAL("Expected: --storage_dir=[PATH]");
+            storage_dir = strdup(optarg);
+            break;
+        case 's':
+            if(!optarg) FATAL("Expected: --since=\"" DATE_FORMAT_HUMAN "\"");
+            date_since_str = strdup(optarg);
+            break;
+        case 'u':
+            if(!optarg) FATAL("Expected: --until=\"" DATE_FORMAT_HUMAN "\"");
+            date_until_str = strdup(optarg);
             break;
         case '?':
             fprintf(stderr, "Unknown argument, see --help");
@@ -147,6 +192,11 @@ int main(int argc, char *argv[]) {
     // register signal handler
     ERR(signal(SIGHUP, sig_handler) == SIG_ERR, "Could not set SIGHUP handler");
 
-    extract_all(storage_dir);
+    populate_date_range(&date_range, date_since_str, date_until_str);
+    free(date_since_str); free(date_until_str);
+
+    extract_all(storage_dir, &date_range);
+    free(storage_dir);
+
     return 0;
 }

@@ -28,6 +28,7 @@ esac],[debug=false])
 if test x"$debug" = x"true"; then
    AC_DEFINE(DEBUG, 1, [debug])
 fi
+AC_DEFINE(_XOPEN_SOURCE, 700)
 
 AC_CHECK_HEADERS(libnetfilter_log/libnetfilter_log.h)
 AC_SEARCH_LIBS(nflog_open, netfilter_log)
