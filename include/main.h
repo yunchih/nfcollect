@@ -133,9 +133,18 @@ typedef struct __attribute__((packed)) _nfl_entry_t {
     /* size: 24, cachelines: 1, members: 8 */
 } nfl_entry_t;
 
+typedef struct _store_manager_t {
+    uint32_t *trunk_size_map;
+
+} nfl_store_manager_t;
+
 typedef struct _nfl_global_t {
     sem_t *nfl_commit_queue;
     uint16_t nfl_group_id;
+
+    uint32_t nfl_storage_consumed;
+    pthread_mutex_t nfl_storage_consumed_lock;
+
     const char *storage_dir;
     enum nfl_compression_t compression_opt;
 } nfl_global_t;

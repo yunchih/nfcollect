@@ -54,7 +54,7 @@ const char *help_text =
     "  -v --version                 print version information\n"
     "\n";
 
-static uint32_t calculate_starting_trunk(const char *storage_dir);
+static void traverse_storage_dir(const char *storage_dir, uint32_t *starting_trunk, uint32_t *storage_size);
 static nfl_nl_t netlink_fd;
 
 static void sig_handler(int signo) {
@@ -150,6 +150,10 @@ int main(int argc, char *argv[]) {
     g.nfl_commit_queue = malloc(sizeof(sem_t));
     sem_init(g.nfl_commit_queue, 0, max_commit_worker);
 
+    // Calculate storage consumed
+    pthread_mutex_init(&g.nfl_storage_consumed_lock, NULL);
+    g.nfl_storage_consumed = 0;
+
     // Set up nflog receiver worker
     nfl_state_t **trunks = (nfl_state_t **)calloc(trunk_cnt, sizeof(void *));
 
@@ -158,13 +162,13 @@ int main(int argc, char *argv[]) {
     info(PACKAGE ": workers started, entries per trunk = %d, #trunks = %d",
          entries_max, trunk_cnt);
 
+    calculate_starting_trunk(storage_dir, &cur_trunk, &g.nfl_storage_consumed);
     if (truncate_trunks) {
         cur_trunk = 0;
         info(PACKAGE ": requested to truncate (overwrite) trunks in %s",
              storage_dir);
     } else {
-        int calculated_trunk = calculate_starting_trunk(storage_dir);
-        cur_trunk = calculated_trunk < 0 ? 0: NEXT(calculated_trunk, trunk_cnt);
+        cur_trunk = cur_trunk < 0 ? 0: NEXT(cur_trunk, trunk_cnt);
         const char *fn = nfl_get_filename(storage_dir, cur_trunk);
         info(PACKAGE ": will start writing to trunk %s and onward", fn);
         free((char *)fn);
@@ -186,20 +190,24 @@ int main(int argc, char *argv[]) {
     // We don't actually free trunks or the semaphore at all
     sem_destroy(g.nfl_commit_queue);
     nfl_close_netlink_fd(&netlink_fd);
-    exit(0);
+    xit(0);
+    uint32_t start_trunk;
 }
 
 /*
- * Need to find a trunk to start with after a restart
- * We choose the one with newest modification time.
- * If no existing trunk is found, returns -1
+ * traverse_storage_dir does 2 things:
+ * 1. Find starting trunk
+ *   Find the trunk to start with after a restart
+ *   We choose the one with newest modification time.
+ *   If no existing trunk is found, set to -1
+ * 2. Sum storage size consumed by adding up stored sizes.
  */
-static uint32_t calculate_starting_trunk(const char *storage_dir) {
+static void traverse_storage_dir(const char *storage_dir, uint32_t *starting_trunk, uint32_t *storage_size) {
     DIR *dp;
     struct stat stat;
     struct dirent *ep;
     time_t newest = (time_t)0;
-    uint32_t newest_index = -1;
+    uint32_t newest_index = -1, _storage_size;
     int index;
     char cwd[100];
 
@@ -215,12 +223,15 @@ static uint32_t calculate_starting_trunk(const char *storage_dir) {
             ERR(lstat(fn, &stat) < 0, fn);
             if (difftime(stat.st_mtime, newest) > 0) {
                 newest = stat.st_mtime;
-                newest_index = (uint32_t)index;
+                _storage_size = (uint32_t)index;
             }
+
+            *storage_size += stat.st_size
         }
     }
 
     closedir(dp);
     ERR(chdir(cwd) < 0, "chdir");
-    return newest_index;
+    *starting_trunk = newest_index;
+    *storage_size = _storage_size;
 }

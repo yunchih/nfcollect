@@ -221,12 +221,12 @@ static void *nfl_start_commit_worker(void *targs) {
     nfl_state_t *nf = (nfl_state_t *)targs;
     const char *filename = nfl_get_filename(g.storage_dir, nf->header->id);
     debug("Comm worker #%u: thread started.", nf->header->id);
-    /* FIXME */
+    /* truncate ? */
     bool truncate = true;
 
     sem_wait(g.nfl_commit_queue);
     debug("Comm worker #%u: commit started.", nf->header->id);
-    nfl_commit_worker(nf->header, nf->store, g.compression_opt, truncate, filename);
+    int ret = nfl_commit_worker(nf->header, nf->store, g.compression_opt, truncate, filename);
     debug("Comm worker #%u: commit done.", nf->header->id);
     sem_post(g.nfl_commit_queue);
 
@@ -238,7 +238,7 @@ static void *nfl_start_commit_worker(void *targs) {
     pthread_cond_signal(&nf->has_finished_recv_cond);
     pthread_mutex_unlock(&nf->has_finished_recv_lock);
 
-    pthread_exit(NULL);
+    pthread_exit(ret);
 }
 
 /*
