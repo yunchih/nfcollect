@@ -22,7 +22,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#define _XOPEN_SOURCE 700      // strptime
+#define _XOPEN_SOURCE 700 // strptime
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809 // strdup
 #endif
@@ -50,9 +50,7 @@
 #define DATE_FORMAT "%Y-%m-%d"
 #define DATE_FORMAT_FULL DATE_FORMAT " %H:%M"
 #define DATE_FORMAT_FULL2 DATE_FORMAT " %H:%M:%S"
-
-sem_t nfl_commit_queue;
-uint16_t nfl_group_id;
+#define DATE_FORMAT_OUTPUT DATE_FORMAT_FULL2
 
 const char *help_text =
     "Usage: " PROG " [OPTION]\n"
@@ -72,20 +70,6 @@ void sig_handler(int signo) {
         puts("Terminated due to SIGHUP ...");
 }
 
-static inline void format_entry(char *output, Entry *e) {
-    sprintf(output,
-            "  "
-            "t=%ld\t"
-            "daddr=%s\t"
-            "proto=%s\t"
-            "uid=%d\t"
-            "sport=%d\t"
-            "dport=%d",
-            e->timestamp, inet_ntoa(e->daddr),
-            e->protocol == IPPROTO_TCP ? "TCP" : "UDP", e->uid, e->sport,
-            e->dport);
-}
-
 static void callback(const State *s, const Timerange *range) {
     int nr_entries = s->header->nr_entries;
 
@@ -95,10 +79,24 @@ static void callback(const State *s, const Timerange *range) {
     while (i < nr_entries && s->store[i].timestamp < range->from)
         i++;
 
-    char output[1024];
+    time_t last_t = 0;
+    char timestamp[20];
     while (i < nr_entries && s->store[i].timestamp < range->until) {
-        format_entry(output, &s->store[i]);
-        puts((char *)output);
+        if (last_t != s->store[i].timestamp || !last_t) {
+            last_t = s->store[i].timestamp;
+            strftime(timestamp, 20, DATE_FORMAT_OUTPUT, localtime(&last_t));
+        }
+
+        printf("  "
+               "%-18s:\t"
+               "daddr=%-16s\t"
+               "proto=%s\t"
+               "uid=%d\t"
+               "sport=%d\t"
+               "dport=%d\n",
+               timestamp, inet_ntoa(s->store[i].daddr),
+               s->store[i].protocol == IPPROTO_TCP ? "TCP" : "UDP",
+               s->store[i].uid, s->store[i].sport, s->store[i].dport);
         ++i;
     }
 }
