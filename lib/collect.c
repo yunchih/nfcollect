@@ -1,7 +1,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2017 Yun-Chih Chen
+// Copyright (c) 2018 Yun-Chih Chen
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -39,7 +39,8 @@
 
 Global g;
 
-static int handle_packet(__attribute__((unused)) struct nflog_g_handle *gh, __attribute__((unused)) struct nfgenmsg *nfmsg,
+static int handle_packet(__attribute__((unused)) struct nflog_g_handle *gh,
+                         __attribute__((unused)) struct nfgenmsg *nfmsg,
                          struct nflog_data *nfa, void *_s) {
 #define HASH_ENTRY(e) (e->sport ^ e->timestamp)
     register const struct iphdr *iph;

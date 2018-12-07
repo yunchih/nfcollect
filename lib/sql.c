@@ -44,7 +44,7 @@ static inline int db_prepare(sqlite3 *db, const char *cmd, const char *errmsg,
 int db_set_pragma(sqlite3 *db) {
     return db_exec_fatal(db,
                          "PRAGMA journal_mode=WAL;"
-                         "PRAGMA foreign_keys = ON;",
+                         "PRAGMA foreign_keys=ON;",
                          "Can't set Sqlite3 PRAGMA");
 }
 

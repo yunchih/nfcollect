@@ -1,7 +1,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2017 Yun-Chih Chen
+// Copyright (c) 2018 Yun-Chih Chen
 // Copyright (c) 2013 Florian Richter (nflogtable)
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy

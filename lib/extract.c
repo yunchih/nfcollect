@@ -44,7 +44,8 @@ static bool extract_zstd(State *s, const void *src) {
 
 static bool extract_lz4(State *s, const void *src) {
     // TODO
-    (void)s; (void)src;
+    (void)s;
+    (void)src;
     return true;
 }
 
