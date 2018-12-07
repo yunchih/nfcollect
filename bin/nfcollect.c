@@ -24,8 +24,7 @@
 // SOFTWARE.
 
 #include "collect.h"
-#include "commit.h"
-#include "common.h"
+#include "util.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -33,9 +32,9 @@
 #include <signal.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <string.h>
 #include <unistd.h>
 
 const char *help_text =
@@ -44,43 +43,32 @@ const char *help_text =
     "Options:\n"
     "  -c --compression=<algo>      compression algorithm to use (default: no "
     "compression)\n"
-    "  -d --storage_dir=<dirname>   log files storage directory\n"
+    "  -d --storage_file=<filename> sqlite database storage file\n"
     "  -h --help                    print this help\n"
     "  -g --nflog-group=<id>        the group id to collect\n"
-    "  -p --parallelism=<num>       max number of committer thread\n"
-    "  -t --truncate                whether or not to truncate existing trunks"
-    " (default: no)\n"
     "  -s --storage_size=<dirsize>  log files maximum total size in MiB\n"
     "  -v --version                 print version information\n"
     "\n";
 
-static void traverse_storage_dir(const char *storage_dir, uint32_t *starting_trunk, uint32_t *storage_size);
-static nfl_nl_t netlink_fd;
-
+static Netlink netlink_fd;
 static void sig_handler(int signo) {
     if (signo == SIGHUP) {
         puts("Terminated due to SIGHUP ...");
-        nfl_close_netlink_fd(&netlink_fd);
+        collect_close_netlink(&netlink_fd);
     }
 }
 
 int main(int argc, char *argv[]) {
-    uint32_t max_commit_worker = 0, storage_size = 0;
-    uint32_t trunk_cnt = 0, trunk_size = 0;
-    uint32_t entries_max, cur_trunk;
-    bool truncate_trunks = false;
-
-    nfl_global_t g;
-    int nfl_group_id = -1;
-    char *compression_flag = NULL, *storage_dir = NULL;
+    uint32_t storage_size = 0;
+    Global g;
+    int nflog_group_id = -1;
+    char *compression_flag = NULL, *storage = NULL;
 
     struct option longopts[] = {/* name, has_args, flag, val */
-                                {"nflog-group", required_argument, NULL, 'g'},
-                                {"storage_dir", required_argument, NULL, 'd'},
+                                {"nflog_group", required_argument, NULL, 'g'},
+                                {"storage", required_argument, NULL, 'd'},
                                 {"storage_size", required_argument, NULL, 's'},
                                 {"compression", optional_argument, NULL, 'z'},
-                                {"parallelism", optional_argument, NULL, 'p'},
-                                {"truncate", no_argument, NULL, 't'},
                                 {"help", no_argument, NULL, 'h'},
                                 {"version", no_argument, NULL, 'v'},
                                 {0, 0, 0, 0}};
@@ -97,20 +85,14 @@ int main(int argc, char *argv[]) {
             printf("%s %s", PACKAGE, VERSION);
             exit(0);
             break;
-        case 't':
-            truncate_trunks = true;
-            break;
         case 'c':
             compression_flag = optarg;
             break;
         case 'd':
-            storage_dir = strdup(optarg);
+            storage = strdup(optarg);
             break;
         case 'g':
-            nfl_group_id = atoi(optarg);
-            break;
-        case 'p':
-            max_commit_worker = atoi(optarg);
+            nflog_group_id = atoi(optarg);
             break;
         case 's':
             storage_size = atoi(optarg);
@@ -122,116 +104,39 @@ int main(int argc, char *argv[]) {
     }
 
     // verify arguments
-    ASSERT(nfl_group_id != -1,
+    ASSERT(nflog_group_id != -1,
            "You must provide a nflog group (see --help)!\n");
-    ASSERT(storage_dir != NULL,
-           "You must provide a storage directory (see --help)\n");
+    ASSERT(storage != NULL, "You must provide a storage file (see --help)\n");
     ASSERT(storage_size != 0, "You must provide the desired size of log file "
                               "(in MiB) (see --help)\n");
 
-    ERR(nfl_check_dir(storage_dir) < 0, "storage directory not exist");
-
-    // max number of commit worker defaults to #processor - 1
-    if (max_commit_worker == 0) {
-        max_commit_worker = sysconf(_SC_NPROCESSORS_ONLN) - 1;
-        max_commit_worker = max_commit_worker > 0 ? max_commit_worker : 1;
-    }
-
-    g.storage_dir = storage_dir;
+    g.compression_type = get_compression(compression_flag);
+    if (check_basedir_exist(storage) < 0)
+        FATAL("Storage directory does not exist");
 
     // register signal handler
-    ERR(signal(SIGHUP, sig_handler) == SIG_ERR, "Could not set SIGHUP handler");
+    if (signal(SIGHUP, sig_handler) == SIG_ERR)
+        ERROR("Could not set SIGHUP handler");
 
-    nfl_cal_trunk(storage_size, &trunk_cnt, &trunk_size);
-    nfl_cal_entries(trunk_size, &entries_max);
-    nfl_setup_compression(compression_flag, &g.compression_opt);
+    pthread_mutex_init(&g.storage_consumed_lock, NULL);
+    g.storage_budget = storage_size * 1024 * 1024; // MB
+    g.storage_consumed = 0;
+    g.storage_file = (const char *)storage;
+    g.max_nr_entries = g_max_nr_entries_default;
 
-    // Set up commit worker
-    g.nfl_commit_queue = malloc(sizeof(sem_t));
-    sem_init(g.nfl_commit_queue, 0, max_commit_worker);
+    collect_open_netlink(&netlink_fd, nflog_group_id);
 
-    // Calculate storage consumed
-    pthread_mutex_init(&g.nfl_storage_consumed_lock, NULL);
-    g.nfl_storage_consumed = 0;
-
-    // Set up nflog receiver worker
-    nfl_state_t **trunks = (nfl_state_t **)calloc(trunk_cnt, sizeof(void *));
-
-    info(PACKAGE ": storing in directory '%s', capped by %d MiB", storage_dir,
+    pthread_t worker;
+    State *state;
+    INFO(PACKAGE ": storing in file '%s', capped by %d MiB", g.storage_file,
          storage_size);
-    info(PACKAGE ": workers started, entries per trunk = %d, #trunks = %d",
-         entries_max, trunk_cnt);
+    INFO(PACKAGE ": workers started, entries per block = %d", g.max_nr_entries);
 
-    calculate_starting_trunk(storage_dir, &cur_trunk, &g.nfl_storage_consumed);
-    if (truncate_trunks) {
-        cur_trunk = 0;
-        info(PACKAGE ": requested to truncate (overwrite) trunks in %s",
-             storage_dir);
-    } else {
-        cur_trunk = cur_trunk < 0 ? 0: NEXT(cur_trunk, trunk_cnt);
-        const char *fn = nfl_get_filename(storage_dir, cur_trunk);
-        info(PACKAGE ": will start writing to trunk %s and onward", fn);
-        free((char *)fn);
+    while (true) {
+        state_init(&state, &netlink_fd, &g);
+        pthread_create(&worker, NULL, collect_worker, (void *)state);
+        pthread_join(worker, NULL);
     }
 
-    nfl_open_netlink_fd(&netlink_fd, nfl_group_id);
-    for (;; cur_trunk = NEXT(cur_trunk, trunk_cnt)) {
-        debug("Running receiver worker: id = %d", cur_trunk);
-        nfl_state_init(&(trunks[cur_trunk]), cur_trunk, entries_max, &g);
-        trunks[cur_trunk]->netlink_fd = &netlink_fd;
-
-        pthread_create(&(trunks[cur_trunk]->thread), NULL, nfl_collect_worker,
-                       (void *)trunks[cur_trunk]);
-        // wait for current receiver worker
-        pthread_join(trunks[cur_trunk]->thread, NULL);
-    }
-
-    // Won't reach here
-    // We don't actually free trunks or the semaphore at all
-    sem_destroy(g.nfl_commit_queue);
-    nfl_close_netlink_fd(&netlink_fd);
-    xit(0);
-    uint32_t start_trunk;
-}
-
-/*
- * traverse_storage_dir does 2 things:
- * 1. Find starting trunk
- *   Find the trunk to start with after a restart
- *   We choose the one with newest modification time.
- *   If no existing trunk is found, set to -1
- * 2. Sum storage size consumed by adding up stored sizes.
- */
-static void traverse_storage_dir(const char *storage_dir, uint32_t *starting_trunk, uint32_t *storage_size) {
-    DIR *dp;
-    struct stat stat;
-    struct dirent *ep;
-    time_t newest = (time_t)0;
-    uint32_t newest_index = -1, _storage_size;
-    int index;
-    char cwd[100];
-
-    ERR(!(dp = opendir(storage_dir)), "Can't open the storage directory");
-
-    ERR(!getcwd(cwd, sizeof(cwd)), "getcwd");
-    ERR(chdir(storage_dir) < 0, "chdir");
-
-    while ((ep = readdir(dp))) {
-        const char *fn = ep->d_name;
-        index = nfl_storage_match_index(fn);
-        if (index >= 0 && index < MAX_TRUNK_ID) {
-            ERR(lstat(fn, &stat) < 0, fn);
-            if (difftime(stat.st_mtime, newest) > 0) {
-                newest = stat.st_mtime;
-                _storage_size = (uint32_t)index;
-            }
-
-            *storage_size += stat.st_size
-        }
-    }
-
-    closedir(dp);
-    ERR(chdir(cwd) < 0, "chdir");
-    *starting_trunk = newest_index;
-    *storage_size = _storage_size;
+    collect_close_netlink(&netlink_fd);
 }

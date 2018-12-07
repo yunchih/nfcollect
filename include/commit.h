@@ -1,11 +1,6 @@
-#ifndef _COMMIT_H
-#define _COMMIT_H
+#ifndef COMMIT_H
+#define COMMIT_H
 
-#include "common.h"
-void nfl_commit_init();
-int nfl_commit_worker(nfl_header_t *header, nfl_entry_t *store,
-                       enum nfl_compression_t compression_opt,
-                       bool truncate,
-                       const char *filename);
+void *commit(void *targs);
 
-#endif
+#endif // COMMIT_H

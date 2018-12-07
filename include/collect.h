@@ -1,9 +1,12 @@
-#pragma once
+
+#ifndef _COLLECT_H
+#define _COLLECT_H
 
 #include "main.h"
-void *nfl_collect_worker(void *targs);
-void nfl_state_init(nfl_state_t **nf, uint32_t id, uint32_t entries_max,
-                    nfl_global_t *g);
-void nfl_state_free(nfl_state_t *nf);
-void nfl_open_netlink_fd(nfl_nl_t *nf, uint16_t group_id);
-void nfl_close_netlink_fd(nfl_nl_t *nf);
+void collect_open_netlink(Netlink *nl, uint16_t group_id);
+void collect_close_netlink(Netlink *nl);
+void *collect_worker(void *targs);
+void state_init(State **s, Netlink *nl, Global *g);
+void state_free(State *s);
+
+#endif // _COLLECT_H

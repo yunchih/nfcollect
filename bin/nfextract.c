@@ -1,7 +1,7 @@
 
 // The MIT License (MIT)
 
-// Copyright (c) 2017 Yun-Chih Chen
+// Copyright (c) 2018 Yun-Chih Chen
 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -22,8 +22,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#include "common.h"
 #include "extract.h"
+#include "main.h"
+#include "sql.h"
+#include "util.h"
+
 #include <dirent.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -34,7 +37,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -51,11 +53,13 @@ const char *help_text =
     "Usage: " PROG " [OPTION]\n"
     "\n"
     "Options:\n"
-    "  -d --storage_dir=<dirname> log files storage directory\n"
+    "  -d --storage=<dirname>     sqlite storage file\n"
     "  -h --help                  print this help\n"
     "  -v --version               print version information\n"
-    "  -s --since                 start showing entries on or newer than the specified date (format: " DATE_FORMAT_HUMAN ")\n"
-    "  -u --until                 stop showing entries on or older than the specified date (format: " DATE_FORMAT_HUMAN ")\n"
+    "  -s --since                 start showing entries on or newer than the "
+    "specified date (format: " DATE_FORMAT_HUMAN ")\n"
+    "  -u --until                 stop showing entries on or older than the "
+    "specified date (format: " DATE_FORMAT_HUMAN ")\n"
     "\n";
 
 void sig_handler(int signo) {
@@ -63,91 +67,76 @@ void sig_handler(int signo) {
         puts("Terminated due to SIGHUP ...");
 }
 
-static void extract_each(const char *storage_dir, const char *filename, const time_range_t *range) {
-    nfl_state_t trunk;
+static inline void format_entry(char *output, Entry *e) {
+    sprintf(output,
+            "  "
+            "t=%ld\t"
+            "daddr=%s\t"
+            "proto=%s\t"
+            "uid=%d\t"
+            "sport=%d\t"
+            "dport=%d",
+            e->timestamp, inet_ntoa(e->daddr),
+            e->protocol == IPPROTO_TCP ? "TCP" : "UDP", e->uid, e->sport,
+            e->dport);
+}
 
-    // Build full path
-    char *fullpath = malloc(strlen(storage_dir) + strlen(filename) + 2);
-    sprintf(fullpath, "%s/%s", storage_dir, filename);
+static void callback(const State *s, const Timerange *range) {
+    int nr_entries = s->header->nr_entries;
 
-    debug("Extracting storage file: %s", fullpath);
-    int entries = nfl_extract_worker(fullpath, &trunk, range);
-    free(fullpath);
+    DEBUG("callback: extracting %d entries", nr_entries);
 
     int i = 0;
-    while(i < entries && trunk.store[i].timestamp < range->from)
+    while (i < nr_entries && s->store[i].timestamp < range->from)
         i++;
 
     char output[1024];
-    while(i < entries && trunk.store[i].timestamp < range->until) {
-        nfl_format_output(output, &trunk.store[i]);
+    while (i < nr_entries && s->store[i].timestamp < range->until) {
+        format_entry(output, &s->store[i]);
         puts((char *)output);
         ++i;
     }
 }
 
-static void extract_all(const char *storage_dir, const time_range_t *range) {
-    DIR *dp;
-    struct dirent *ep;
-    int i, index, max_index = -1;
-    char *trunk_files[MAX_TRUNK_ID];
-    memset(trunk_files, 0, sizeof(trunk_files));
-
-    ERR(!(dp = opendir(storage_dir)), "Can't open the storage directory");
-    while ((ep = readdir(dp))) {
-        index = nfl_storage_match_index(ep->d_name);
-        if (index >= 0) {
-            debug("Storage file %s matches with index %d", ep->d_name, index);
-            if (index >= MAX_TRUNK_ID) {
-                WARN(1, "Storage trunk file index "
-                        "out of predefined range: %s",
-                     ep->d_name);
-                return;
-            } else {
-                trunk_files[index] = strdup(ep->d_name);
-                if (index > max_index)
-                    max_index = index;
-            }
-        }
-    }
-
-    closedir(dp);
-
-    for (i = 0; i <= max_index; ++i) {
-        if (trunk_files[i])
-            extract_each(storage_dir, trunk_files[i], range);
-        free(trunk_files[i]);
-    }
+static void extract_all(const char *storage, const Timerange *range) {
+    sqlite3 *db = NULL;
+    db_open(&db, storage);
+    db_read_data_by_timerange(db, range, callback);
+    db_close(db);
 }
 
 static time_t parse_date_string(time_t default_t, const char *date) {
     struct tm parsed;
     char *ret;
-    if(!date) return default_t;
+    if (!date)
+        return default_t;
 
-#define PARSE(FORMAT) \
-        ret = strptime(date, FORMAT, &parsed); \
-        if(ret && !*ret) return mktime(&parsed); \
+#define PARSE(FORMAT)                                                          \
+    ret = strptime(date, FORMAT, &parsed);                                     \
+    if (ret && !*ret)                                                          \
+        return mktime(&parsed);
 
     PARSE(DATE_FORMAT);
     PARSE(DATE_FORMAT_FULL);
     PARSE(DATE_FORMAT_FULL2);
 
-    FATAL("Wrong date format: expected: \"" DATE_FORMAT_HUMAN "\", got: \"%s\"", date);
+    FATAL("Wrong date format: expected: \"" DATE_FORMAT_HUMAN "\", got: \"%s\"",
+          date);
     return -1;
 }
-static void populate_date_range(time_range_t *range, const char *since, const char *until) {
-    range->from  = parse_date_string(0, since);
+
+static void populate_date_range(Timerange *range, const char *since,
+                                const char *until) {
+    range->from = parse_date_string(0, since);
     range->until = parse_date_string(time(NULL), until);
 }
 
 int main(int argc, char *argv[]) {
-    char *storage_dir = NULL;
+    char *storage = NULL;
     char *date_since_str = NULL, *date_until_str = NULL;
-    time_range_t date_range;
+    Timerange date_range;
 
-    struct option longopts[] = {/* name, has_args, flag, val */
-                                {"storage_dir", required_argument, NULL, 'd'},
+    struct option longopts[] = {{"storage_file", required_argument, NULL, 'd'},
                                 {"since", optional_argument, NULL, 's'},
                                 {"until", optional_argument, NULL, 'u'},
                                 {"help", no_argument, NULL, 'h'},
@@ -155,7 +144,7 @@ int main(int argc, char *argv[]) {
                                 {0, 0, 0, 0}};
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "d:hv", longopts, NULL)) != -1) {
+    while ((opt = getopt_long(argc, argv, "d:s:u:hv", longopts, NULL)) != -1) {
         switch (opt) {
         case 'h':
             printf("%s", help_text);
@@ -166,37 +155,41 @@ int main(int argc, char *argv[]) {
             exit(0);
             break;
         case 'd':
-            if(!optarg) FATAL("Expected: --storage_dir=[PATH]");
-            storage_dir = strdup(optarg);
+            if (!optarg)
+                FATAL("Expected: --storage_file=[PATH]");
+            storage = strdup(optarg);
             break;
         case 's':
-            if(!optarg) FATAL("Expected: --since=\"" DATE_FORMAT_HUMAN "\"");
+            if (!optarg)
+                FATAL("Expected: --since=\"" DATE_FORMAT_HUMAN "\"");
             date_since_str = strdup(optarg);
             break;
         case 'u':
-            if(!optarg) FATAL("Expected: --until=\"" DATE_FORMAT_HUMAN "\"");
+            if (!optarg)
+                FATAL("Expected: --until=\"" DATE_FORMAT_HUMAN "\"");
             date_until_str = strdup(optarg);
             break;
         case '?':
-            fprintf(stderr, "Unknown argument, see --help");
-            exit(1);
+            FATAL("Unknown argument, see --help");
         }
     }
 
     // verify arguments
-    ASSERT(storage_dir != NULL,
+    ASSERT(storage != NULL,
            "You must provide a storage directory (see --help)");
 
-    ERR(nfl_check_dir(storage_dir) < 0, "storage directory not exist");
+    if (check_file_exist(storage) < 0)
+        ERROR("storage file not exist");
 
-    // register signal handler
-    ERR(signal(SIGHUP, sig_handler) == SIG_ERR, "Could not set SIGHUP handler");
+    if (signal(SIGHUP, sig_handler) == SIG_ERR)
+        ERROR("Could not set SIGHUP handler");
 
     populate_date_range(&date_range, date_since_str, date_until_str);
-    free(date_since_str); free(date_until_str);
+    free(date_since_str);
+    free(date_until_str);
 
-    extract_all(storage_dir, &date_range);
-    free(storage_dir);
+    extract_all(storage, &date_range);
+    free(storage);
 
     return 0;
 }
