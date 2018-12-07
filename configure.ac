@@ -12,7 +12,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 # ChangeLog, COPYING, AUTHORS, INSTALL, README etc. files.
 AM_INIT_AUTOMAKE([-Wall -Werror foreign dist-xz subdir-objects])
 
-#AM_SILENT_RULES([yes])
+AM_SILENT_RULES([yes])
 AC_CONFIG_SRCDIR([bin/nfcollect.c])
 
 AC_PROG_CC([clang])
@@ -28,9 +28,6 @@ esac],[debug=false])
 if test x"$debug" = x"true"; then
    AC_DEFINE(DEBUG, 1, [debug])
 fi
-
-AC_DEFINE(_XOPEN_SOURCE, 700)    # strptime
-AC_DEFINE(_POSIX_C_SOURCE, 200809) # strdup
 
 AC_CHECK_HEADERS(libnetfilter_log/libnetfilter_log.h)
 AC_SEARCH_LIBS(nflog_open, netfilter_log)
