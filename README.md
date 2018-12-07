@@ -52,21 +52,21 @@ Usage: nfcollect [OPTION]
 
 Options:
   -c --compression=<algo>      compression algorithm to use (default: no compression)
-  -d --storage_dir=<dirname>   log files storage directory
+  -d --storage_file=<filename> sqlite database storage file
   -h --help                    print this help
   -g --nflog-group=<id>        the group id to collect
-  -p --parallelism=<num>       max number of committer thread
   -s --storage_size=<dirsize>  log files maximum total size in MiB
-  -t --truncate                whether or not to truncate existing trunks (default: no)
   -v --version                 print version information
 
 $ ./nfextract -h     
 Usage: nfextract [OPTION]
 
 Options:
-  -d --storage_dir=<dirname>   log files storage directory
-  -h --help                    print this help
-  -v --version                 print version information
+  -d --storage=<dirname>     sqlite storage file
+  -h --help                  print this help
+  -v --version               print version information
+  -s --since                 start showing entries on or newer than the specified date (format: YYYY-MM-DD [HH:MM][:SS])
+  -u --until                 stop showing entries on or older than the specified date (format: YYYY-MM-DD [HH:MM][:SS])
 ```
 
 #### Examples
@@ -76,13 +76,12 @@ Options:
 sudo iptables -A OUTPUT -p tcp -d 127.0.0.1  -j NFLOG --nflog-group 5
 
 # Receive the packets from nfnetlink
-mkdir my-nflog
-sudo ./nfcollect -d my-nflog -g 5 -s 100 -c zstd
+sudo ./nfcollect -d packets.db -g 5 -s 100 -c zstd
 
 # Let it collect for a while ...
 
 # Dump the collected packets
-./nfextract -d my-nflog
+./nfextract -d packets.db
 ```
 
 
@@ -91,3 +90,4 @@ sudo ./nfcollect -d my-nflog -g 5 -s 100 -c zstd
 * libnetfilter_log: https://www.icir.org/gregor/tools/files/doc.libnetfilter_log/html/libnetfilter__log.html
 * zstd: https://facebook.github.io/zstd/zstd_manual.html
 * lz4: https://github.com/lz4/lz4
+* sqlite: https://www.sqlite.org
