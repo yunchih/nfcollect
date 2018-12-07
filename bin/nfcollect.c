@@ -43,11 +43,11 @@ const char *help_text =
     "Options:\n"
     "  -c --compression=<algo>      compression algorithm to use (default: no "
     "compression)\n"
-    "  -d --storage_file=<filename> sqlite database storage file\n"
-    "  -h --help                    print this help\n"
-    "  -g --nflog-group=<id>        the group id to collect\n"
-    "  -s --storage_size=<dirsize>  log files maximum total size in MiB\n"
-    "  -v --version                 print version information\n"
+    "  -d --storage_file=<filename>    sqlite database storage file\n"
+    "  -h --help                       print this help\n"
+    "  -g --nflog-group=<id>           the group id to collect\n"
+    "  -s --storage_size=<max DB size> maximum DB size in MiB\n"
+    "  -v --version                    print version information\n"
     "\n";
 
 static Netlink netlink_fd;

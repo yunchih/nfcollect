@@ -44,8 +44,7 @@
 #define g_sqlite_nr_fail_retry 8
 #define g_gc_rate 16
 // Default number of packets stored in a block
-//#define g_max_nr_entries_default (256*1024)
-#define g_max_nr_entries_default (1 * 128)
+#define g_max_nr_entries_default (256*1024/24)
 #ifdef DEBUG_OUTPUT
 #define DEBUG_ON 1
 #else

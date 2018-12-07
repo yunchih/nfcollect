@@ -111,8 +111,6 @@ int db_insert(sqlite3 *db, const Header *header, const Entry *entries) {
     for (int i = 0; i < 2;) {
         rc = db_prepare(db, insert_sql[i], "Can't insert data", &stmt[i]);
         if (i == 0) {
-            printf("Inserting raw data: %02X:%02X", ((char *)entries)[0],
-                   ((char *)entries)[1]);
             sqlite3_bind_blob(stmt[i], 1, entries, header->raw_size,
                               SQLITE_STATIC);
         } else {
