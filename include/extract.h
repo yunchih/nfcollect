@@ -1,4 +1,7 @@
-#pragma once
+#ifndef _EXTRACT_H
+#define _EXTRACT_H
 
-#include "common.h"
-int nfl_extract_worker(const char *filename, nfl_state_t *state, const time_range_t *range);
+#include "main.h"
+bool extract(State *s, const void *src);
+
+#endif // _EXTRACT_H

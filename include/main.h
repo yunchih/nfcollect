@@ -23,21 +23,30 @@
 
 #ifndef _MAIN_H
 #define _MAIN_H
+#include <arpa/inet.h>
 #include <assert.h>
+#include <linux/tcp.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
-#include <linux/tcp.h>
 #include <netinet/udp.h>
+#include <pthread.h>
 #include <semaphore.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <time.h>
 
-#include <pthread.h>
-#include <sys/types.h>
-
-#ifdef DEBUG
+// Global variables
+#define g_sqlite_table_header "nfcollect_v1_header"
+#define g_sqlite_table_data "nfcollect_v1_data"
+#define g_sqlite_nr_fail_retry 8
+#define g_gc_rate 16
+// Default number of packets stored in a block
+//#define g_max_nr_entries_default (256*1024)
+#define g_max_nr_entries_default (1 * 128)
+#ifdef DEBUG_OUTPUT
 #define DEBUG_ON 1
 #else
 #define DEBUG_ON 0
@@ -49,22 +58,16 @@
         exit(1);                                                               \
     }
 
-#define ERR(command, error_msg)                                                \
-    if (command) {                                                             \
-        perror((error_msg));                                                   \
-        exit(1);                                                               \
-    }
+#define ERROR(format, ...)                                                     \
+    fprintf(stdout, "[ERROR] " format "\n", ##__VA_ARGS__);
 
 #define FATAL(format, ...)                                                     \
     do {                                                                       \
-        fprintf(stdout, "[ERROR] " format "\n", ##__VA_ARGS__);                \
+        fprintf(stdout, "[FATAL] " format "\n", ##__VA_ARGS__);                \
         exit(1);                                                               \
     } while (0)
 
-#define WARN(command, format, ...)                                             \
-    if (command) {                                                             \
-        fprintf(stdout, "[WARN] " format "\n", ##__VA_ARGS__);                 \
-    }
+#define WARN(format, ...) fprintf(stdout, "[WARN] " format "\n", ##__VA_ARGS__);
 
 #define WARN_RETURN(command, format, ...)                                      \
     if (command) {                                                             \
@@ -72,106 +75,81 @@
         return -1;                                                             \
     }
 
-#define debug(format, ...)                                                     \
+#define DEBUG(format, ...)                                                     \
     if (DEBUG_ON) {                                                            \
         fprintf(stdout, "[DEBUG] " format "\n", ##__VA_ARGS__);                \
     }
 
-#define info(format, ...) fprintf(stdout, "[INFO] " format "\n", ##__VA_ARGS__);
+#define INFO(format, ...) fprintf(stdout, "[INFO] " format "\n", ##__VA_ARGS__);
 
 #define likely(x) __builtin_expect((x), 1)
 #define unlikely(x) __builtin_expect((x), 0)
 
-#define CEIL_DIV(a, b) (((a) + (b)-1) / (b))
-#define NEXT(i, l) ((i + 1) % l)
-#define PREV(i, l) ((i - 1) % l)
-#define TRUNK_SIZE_BY_PAGE (150) // 150 pages
-#define MAX_SEGMENT_PER_TRUNK (1024)
-#define MAX_TRUNK_ID (80)
-#define STORAGE_PREFIX "nflog_storage"
+#ifdef __GNUC__
+#define UNUSED_FUNCTION(x) __attribute__((__unused__)) UNUSED_ ## x
+#else
+#define UNUSED_FUNCTION(x) UNUSED_ ## x
+#endif
 
-enum nfl_compression_t { COMPRESS_NONE, COMPRESS_LZ4, COMPRESS_ZSTD };
-typedef struct __attribute__((packed)) _nfl_header_t {
-    uint32_t               id;                   /*     0     4 */
-    uint32_t               n_entries;            /*     4     4 */
-    uint32_t               max_n_entries;        /*     8     4 */
-    uint32_t               cksum;                /*    12     4 */
-    uint32_t               raw_size;             /*    16     4 */
-    enum nfl_compression_t compression_opt;      /*    20     4 */
-    time_t                 start_time;           /*    24     8 */
-    time_t                 end_time;             /*    32     8 */
+enum CompressionType { COMPRESS_NONE, COMPRESS_LZ4, COMPRESS_ZSTD };
 
-    /* size: 40, cachelines: 1, members: 8 */
-    /* last cacheline: 40 bytes */
-} nfl_header_t;
+typedef struct _Header {
+    uint32_t nr_entries;
+    uint32_t raw_size;
+    enum CompressionType compression_type;
+    time_t start_time;
+    time_t end_time;
+} Header;
 
-typedef struct __attribute__((packed)) _nfl_entry_t {
+typedef struct __attribute__((packed)) _Entry {
     // current timestamp since UNIX epoch
-    time_t timestamp;           /*     0     8 */
-
+    time_t timestamp;
     // dest address
-    struct in_addr daddr;       /*     8     4 */
-
+    struct in_addr daddr;
     // uid
-    uint32_t uid;               /*    12     4 */
-
+    uint32_t uid;
     // unused space, just for padding
-    uint8_t __unused1;          /*    16     1 */
-
+    uint8_t __unused1;
     // IP protocol (UDP or TCP)
-    uint8_t protocol;           /*    17     1 */
-
+    uint8_t protocol;
     // unused space, just for padding
-    uint16_t __unused2;         /*    18     2 */
-
+    uint16_t __unused2;
     // source port
-    uint16_t sport;             /*    20     2 */
-
+    uint16_t sport;
     // destination port
-    uint16_t dport;             /*    22     2 */
+    uint16_t dport;
 
     /* size: 24, cachelines: 1, members: 8 */
-} nfl_entry_t;
-
-typedef struct _store_manager_t {
-    uint32_t *trunk_size_map;
-
-} nfl_store_manager_t;
-
-typedef struct _nfl_global_t {
-    sem_t *nfl_commit_queue;
-    uint16_t nfl_group_id;
-
-    uint32_t nfl_storage_consumed;
-    pthread_mutex_t nfl_storage_consumed_lock;
-
-    const char *storage_dir;
-    enum nfl_compression_t compression_opt;
-} nfl_global_t;
+} Entry;
 
 typedef struct _nfl_nl_t {
     struct nflog_handle *fd;
     struct nflog_g_handle *group_fd;
-} nfl_nl_t;
+} Netlink;
 
-typedef struct _nfl_state_t {
-    nfl_global_t *global;
-    nfl_header_t *header;
-    nfl_entry_t *store;
-    nfl_nl_t *netlink_fd;
+typedef struct _Global {
+    uint16_t nl_group_id;
 
-    bool has_finished_recv;
-    pthread_cond_t has_finished_recv_cond;
-    pthread_mutex_t has_finished_recv_lock;
+    uint32_t storage_budget;
+    uint32_t storage_consumed;
+    pthread_mutex_t storage_consumed_lock;
 
-    pthread_t thread;
-} nfl_state_t;
+    uint32_t max_nr_entries;
+    const char *storage_file;
+    enum CompressionType compression_type;
+} Global;
 
-typedef struct _time_range_t {
+typedef struct _State {
+    Header *header;
+    Entry *store;
+    Netlink *netlink_fd;
+    Global *global;
+} State;
+
+typedef struct _Timerange {
     time_t from, until;
-} time_range_t;
+} Timerange;
 
-// only copy size of ipv4 header + tcp header
-static const int nfl_recv_size = sizeof(struct iphdr) + sizeof(struct tcphdr);
+typedef void (*StateCallback)(const State *s, const Timerange *t);
 
 #endif // _MAIN_H
