@@ -232,7 +232,7 @@ int db_delete_oldest_bytes(sqlite3 *db, int64_t bytes) {
     size_t bufsize = 1024;
     char *buf = malloc(bufsize);
 
-    while (bytes >= 0) {
+    while (true) {
         rc = sqlite3_step(stmt);
         if (rc == SQLITE_DONE)
             break;
@@ -240,8 +240,12 @@ int db_delete_oldest_bytes(sqlite3 *db, int64_t bytes) {
         sqlite3_int64 index = sqlite3_column_int64(stmt, 2);
         int size = sqlite3_column_int(stmt, 0);
 
+        bytes -= size;
+        if (bytes <= 0)
+            break;
+
         char _buf[22];
-        sprintf(_buf, count ? "%lld" : ",%lld", index);
+        sprintf(_buf, count ? ",%lld" : "%lld", index);
         while (strlen(_buf) + strlen(buf) + 2 >= bufsize) {
             bufsize *= 2;
             char *__buf = malloc(bufsize);
