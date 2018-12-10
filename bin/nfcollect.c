@@ -101,6 +101,9 @@ int main(int argc, char *argv[]) {
         case 's':
             storage_size = atoi(optarg);
             break;
+        case 'V':
+            do_vacuum = true;
+            break;
         case '?':
             fprintf(stderr, "Unknown argument, see --help\n");
             exit(1);
@@ -122,9 +125,18 @@ int main(int argc, char *argv[]) {
     if (signal(SIGHUP, sig_handler) == SIG_ERR)
         ERROR("Could not set SIGHUP handler");
 
+    // Vacuum and get current space consumption
+    if (do_vacuum && check_file_exist(storage)) {
+        INFO(PACKAGE ": vacuum database on startup");
+        sqlite3 *db = NULL;
+        db_open(&db, storage);
+        db_vacuum(db);
+        db_close(db);
+    }
+
     pthread_mutex_init(&g.storage_consumed_lock, NULL);
     g.storage_budget = storage_size * 1024 * 1024; // MB
-    g.storage_consumed = 0;
+    g.storage_consumed = check_file_size(storage);
     g.storage_file = (const char *)storage;
     g.max_nr_entries = g_max_nr_entries_default;
 
