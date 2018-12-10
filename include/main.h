@@ -85,9 +85,9 @@
 #define unlikely(x) __builtin_expect((x), 0)
 
 #ifdef __GNUC__
-#define UNUSED_FUNCTION(x) __attribute__((__unused__)) UNUSED_ ## x
+#define UNUSED_FUNCTION(x) __attribute__((__unused__)) UNUSED_##x
 #else
-#define UNUSED_FUNCTION(x) UNUSED_ ## x
+#define UNUSED_FUNCTION(x) UNUSED_##x
 #endif
 
 enum CompressionType { COMPRESS_NONE, COMPRESS_LZ4, COMPRESS_ZSTD };
@@ -129,8 +129,8 @@ typedef struct _nfl_nl_t {
 typedef struct _Global {
     uint16_t nl_group_id;
 
-    uint32_t storage_budget;
-    uint32_t storage_consumed;
+    int64_t storage_budget;
+    int64_t storage_consumed;
     pthread_mutex_t storage_consumed_lock;
 
     uint32_t max_nr_entries;

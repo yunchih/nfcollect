@@ -8,6 +8,12 @@ int check_file_exist(const char *storage) {
     return access(storage, F_OK) != -1;
 }
 
+int check_file_size(const char *storage) {
+    struct stat st;
+    stat(storage, &st);
+    return st.st_size;
+}
+
 int check_basedir_exist(const char *storage) {
     char *_storage = strdup(storage);
     char *basedir = dirname(_storage);
@@ -28,7 +34,9 @@ enum CompressionType get_compression(const char *flag) {
     } else if (!strcmp(flag, "lz4")) {
         return COMPRESS_LZ4;
     } else {
-        fprintf(stderr, "Unknown compression algorithm: %s\n", flag);
-        return 0;
+        FATAL("Unknown compression algorithm: %s\n", flag);
+        exit(1);
     }
+
+    return 0;
 }

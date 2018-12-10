@@ -24,6 +24,7 @@
 // SOFTWARE.
 
 #include "collect.h"
+#include "sql.h"
 #include "util.h"
 #include <dirent.h>
 #include <fcntl.h>
@@ -43,10 +44,11 @@ const char *help_text =
     "Options:\n"
     "  -c --compression=<algo>      compression algorithm to use (default: no "
     "compression)\n"
-    "  -d --storage_file=<filename>    sqlite database storage file\n"
+    "  -d --storage=<filename>         sqlite database storage file\n"
     "  -h --help                       print this help\n"
-    "  -g --nflog-group=<id>           the group id to collect\n"
+    "  -g --nflog_group=<id>           the group id to collect\n"
     "  -s --storage_size=<max DB size> maximum DB size in MiB\n"
+    "  -V --vacuum                     vacuum the database on startup\n"
     "  -v --version                    print version information\n"
     "\n";
 
@@ -63,18 +65,20 @@ int main(int argc, char *argv[]) {
     Global g;
     int nflog_group_id = -1;
     char *compression_flag = NULL, *storage = NULL;
+    bool do_vacuum = false;
 
     struct option longopts[] = {/* name, has_args, flag, val */
                                 {"nflog_group", required_argument, NULL, 'g'},
                                 {"storage", required_argument, NULL, 'd'},
                                 {"storage_size", required_argument, NULL, 's'},
                                 {"compression", optional_argument, NULL, 'z'},
+                                {"vacuum", optional_argument, NULL, 'V'},
                                 {"help", no_argument, NULL, 'h'},
                                 {"version", no_argument, NULL, 'v'},
                                 {0, 0, 0, 0}};
 
     int opt;
-    while ((opt = getopt_long(argc, argv, "c:g:d:s:hvp:", longopts, NULL)) !=
+    while ((opt = getopt_long(argc, argv, "c:g:d:s:hVvp:", longopts, NULL)) !=
            -1) {
         switch (opt) {
         case 'h':
@@ -128,7 +132,9 @@ int main(int argc, char *argv[]) {
 
     pthread_t worker;
     State *state;
-    INFO(PACKAGE ": storing in file '%s', capped by %d MiB", g.storage_file,
+    INFO(PACKAGE
+         ": storing in file '%s' (current size: %.2f MB), capped by %d MiB",
+         g.storage_file, (float)g.storage_consumed / 1024.0 / 1024.0,
          storage_size);
     INFO(PACKAGE ": workers started, entries per block = %d", g.max_nr_entries);
 

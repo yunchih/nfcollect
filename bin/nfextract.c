@@ -59,9 +59,9 @@ const char *help_text =
     "  -d --storage=<dirname>     sqlite storage file\n"
     "  -h --help                  print this help\n"
     "  -v --version               print version information\n"
-    "  -s --since                 start showing entries on or newer than the "
+    "  -s --since=<date>          start showing entries on or newer than the "
     "specified date (format: " DATE_FORMAT_HUMAN ")\n"
-    "  -u --until                 stop showing entries on or older than the "
+    "  -u --until=<date>          stop showing entries on or older than the "
     "specified date (format: " DATE_FORMAT_HUMAN ")\n"
     "\n";
 
