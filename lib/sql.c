@@ -220,7 +220,8 @@ int db_delete_oldest_bytes(sqlite3 *db, int64_t bytes) {
     if (!bytes)
         return 0;
 
-    db_exec_fatal(db, "BEGIN TRANSACTION", "db_delete: Can't begin txn");
+    db_exec_fatal(db, "BEGIN TRANSACTION",
+                  "db_delete_oldest_byte: Can't begin txn");
     rc = sqlite3_prepare_v2(db, select_sql, -1, &stmt, 0);
     if (rc != SQLITE_OK) {
         ERROR("Can't select (%i): %s\n", rc, sqlite3_errmsg(db));
@@ -255,24 +256,23 @@ int db_delete_oldest_bytes(sqlite3 *db, int64_t bytes) {
         }
 
         strcat(buf, _buf);
-        bytes -= size;
         count++;
     }
 
-    if (!*buf)
-        return 0;
+    if (count) {
+        const char *_delete_sql =
+            "DELETE FROM " g_sqlite_table_data " WHERE id in (%s);";
+        char *delete_sql = malloc(strlen(_delete_sql) + strlen(buf) + 1);
+        sprintf(delete_sql, _delete_sql, buf);
+        db_exec_fatal(db, delete_sql, "Can't delete");
+        DEBUG("Deleted old data, SQL: %s", delete_sql);
+        free(delete_sql);
+    }
 
-    const char *_delete_sql =
-        "DELETE FROM " g_sqlite_table_data " WHERE id in (%s);";
-    char *delete_sql = malloc(strlen(_delete_sql) + strlen(buf) + 1);
-    sprintf(delete_sql, _delete_sql, buf);
-    db_exec_fatal(db, delete_sql, "Can't delete");
-    DEBUG("Deleted old data, SQL: %s", delete_sql);
-    free(delete_sql);
     free(buf);
-
     assert(SQLITE_SCHEMA != sqlite3_finalize(stmt));
-    db_exec_fatal(db, "END TRANSACTION", "db_begin: Can't end txn");
+    db_exec_fatal(db, "END TRANSACTION",
+                  "db_delete_oldest_byte: Can't end txn");
 
     return count;
 }

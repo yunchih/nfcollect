@@ -42,9 +42,11 @@
 #define g_sqlite_table_header "nfcollect_v1_header"
 #define g_sqlite_table_data "nfcollect_v1_data"
 #define g_sqlite_nr_fail_retry 8
+// Number of blocks recycled at each GC when space is depleted
 #define g_gc_rate 16
+#define g_gc_cap 0.85
 // Default number of packets stored in a block
-#define g_max_nr_entries_default (256*1024/24)
+#define g_max_nr_entries_default (256 * 1024 / 24)
 #ifdef DEBUG_OUTPUT
 #define DEBUG_ON 1
 #else
