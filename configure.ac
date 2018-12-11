@@ -1,4 +1,4 @@
-AC_INIT([nfcollect], [1.0])
+AC_INIT([nfcollect], [0.2])
 
 # Safety checks in case user overwritten --srcdir
 AC_CONFIG_SRCDIR([nfcollect.c])
