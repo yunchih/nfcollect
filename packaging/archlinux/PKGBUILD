@@ -7,7 +7,7 @@ arch=(x86_64)
 url='https://github.com/yunchih/nfcollect'
 license=(MIT)
 makedepends=(automake autoconf clang make)
-depends=(libnetfilter_log zstd)
+depends=(libnetfilter_log sqlite zstd)
 source=(https://github.com/yunchih/${pkgname}/releases/download/v${pkgver}/${pkgname}-${pkgver}-${pkgrel}.tar.gz)
 sha1sums=('1b23e15c5686df985926c638068bce00970b802c')
 
