@@ -1,7 +1,7 @@
 # Maintainer: Yun-Chih Chen <yunchih@csie.ntu.edu.tw>
 pkgname=nfcollect
-pkgver=0.1
-pkgrel=2
+pkgver=0.2
+pkgrel=1
 pkgdesc='Collect NFLOG log entries and commit them to stable storage in binary (compressed) format'
 arch=(x86_64)
 url='https://github.com/yunchih/nfcollect'

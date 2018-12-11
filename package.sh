@@ -1,8 +1,8 @@
 #!/bin/sh
 
 PKGNAME=nfcollect
-PKGVER=0.1
-PKGREL=2
+PKGVER=0.2
+PKGREL=1
 PKGDIR=${PKGNAME}-${PKGVER}
 PKG="${PKGNAME}-${PKGVER}-${PKGREL}.tar.gz"
 
