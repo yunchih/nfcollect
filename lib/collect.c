@@ -42,7 +42,9 @@ Global g;
 static int handle_packet(__attribute__((unused)) struct nflog_g_handle *gh,
                          __attribute__((unused)) struct nfgenmsg *nfmsg,
                          struct nflog_data *nfa, void *_s) {
-#define HASH_ENTRY(e) (e->sport ^ e->timestamp)
+// log a bursting connection every `BURST_PERIOD` second
+#define BURST_PERIOD 0x4
+#define HASH_ENTRY(e) (e->sport ^ (e->timestamp & ~(BURST_PERIOD - 1)))
     register const struct iphdr *iph;
     register Entry *entry;
     const struct tcphdr *tcph;
