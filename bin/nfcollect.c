@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
 
     g.compression_type = get_compression(compression_flag);
     if (check_basedir_exist(storage) < 0)
-        FATAL("Storage directory does not exist");
+        FATAL("Storage directory: %s does not exist", storage);
 
     // register signal handler
     if (signal(SIGHUP, sig_handler) == SIG_ERR)

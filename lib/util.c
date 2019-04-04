@@ -17,13 +17,12 @@ int check_file_size(const char *storage) {
 int check_basedir_exist(const char *storage) {
     char *_storage = strdup(storage);
     char *basedir = dirname(_storage);
-    free(_storage);
 
-    struct stat d;
-    if (stat(basedir, &d) != 0 || !S_ISDIR(d.st_mode)) {
-        return -1;
-    }
-    return 0;
+    struct stat d; int ret = 0;
+    if (stat(basedir, &d) != 0 || !S_ISDIR(d.st_mode))
+        ret = -1;
+    free(_storage);
+    return ret;
 }
 
 enum CompressionType get_compression(const char *flag) {
