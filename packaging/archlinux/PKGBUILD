@@ -1,7 +1,7 @@
 # Maintainer: Yun-Chih Chen <yunchih@csie.ntu.edu.tw>
 pkgname=nfcollect
 pkgver=0.2
-pkgrel=2
+pkgrel=3
 pkgdesc='Collect NFLOG log entries and commit them to stable storage in binary (compressed) format'
 arch=(x86_64)
 url='https://github.com/yunchih/nfcollect'
@@ -9,7 +9,7 @@ license=(MIT)
 makedepends=(automake autoconf clang make)
 depends=(libnetfilter_log sqlite zstd)
 source=(https://github.com/yunchih/${pkgname}/releases/download/v${pkgver}/${pkgname}-${pkgver}-${pkgrel}.tar.gz)
-sha1sums=('530cfcab1718cb21bb61ad94c6b8d27ac5d582d6')
+sha1sums=('3c534b264493ef1d28d311525240c71bd7e62158')
 
 build() {
   cd $pkgname-$pkgver
